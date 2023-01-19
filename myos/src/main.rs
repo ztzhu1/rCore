@@ -1,24 +1,32 @@
+#![deny(warnings)]
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
 
-#[macro_use]
-mod console;
-mod lang_items;
-mod sbi;
-mod practice1;
-
 use core::arch::global_asm;
 
-use sbi::shutdown;
+#[path = "boards/qemu.rs"]
+mod board;
+
+#[macro_use]
+mod console;
+pub mod batch;
+mod lang_items;
+mod sbi;
+mod sync;
+pub mod syscall;
+pub mod trap;
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_app.S"));
 
 #[no_mangle]
 fn rust_main() -> ! {
     clear_bss();
-    practice1::call_stack::print_call_stack();
-    shutdown()
+    println!("[kernel] Hello, world!");
+    trap::init();
+    batch::init();
+    batch::run_next_app();
 }
 
 fn clear_bss() {
