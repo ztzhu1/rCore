@@ -1,5 +1,5 @@
 use core::panic::PanicInfo;
-use crate::sbi::exit_failure;
+use super::exit;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -13,5 +13,5 @@ fn panic(info: &PanicInfo) -> ! {
     } else {
         println!("[kernel] Panicked: {}", info.message().unwrap());
     }
-    exit_failure();
+    exit(1);
 }
