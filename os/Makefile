@@ -1,29 +1,36 @@
-elf_file := target/riscv64gc-unknown-none-elf/debug/os
-bin_file := $(elf_file).bin
+ELF_FILE := target/riscv64gc-unknown-none-elf/debug/os
+BIN_FILE := $(ELF_FILE).bin
 
 build:
 	@cargo build
-	@rust-objcopy --strip-all $(elf_file) -O binary $(bin_file)
+	@rust-objcopy --strip-all $(ELF_FILE) -O binary $(BIN_FILE)
 
 run: build
 	@qemu-system-riscv64 \
     -machine virt \
     -nographic \
     -bios ../bootloader/rustsbi-qemu.bin \
-    -device loader,file=$(bin_file),addr=0x80200000
+    -device loader,file=$(BIN_FILE),addr=0x80200000
 
 debug: build
 	@qemu-system-riscv64 \
     -machine virt \
     -nographic \
     -bios ../bootloader/rustsbi-qemu.bin \
-    -device loader,file=$(bin_file),addr=0x80200000 \
+    -device loader,file=$(BIN_FILE),addr=0x80200000 \
 	-s -S
 
 gdb:
 	@riscv64-unknown-elf-gdb \
-    -ex 'file $(elf_file)' \
+    -ex 'file $(ELF_FILE)' \
     -ex 'set arch riscv:rv64' \
     -ex 'target remote localhost:1234'
 
-.PHONY: build run debug gdb
+APP_PATH := ../user/src/bin
+APPS := $(wildcard $(APP_PATH)/*.rs)
+
+link_app:
+	@rustc build.rs && ./build
+	@rm ./build
+
+.PHONY: build run debug gdb link_app
