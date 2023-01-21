@@ -11,7 +11,7 @@ mod sbi;
 
 use core::arch::global_asm;
 
-global_asm!(include_str!("entry.s"));
+global_asm!(include_str!("entry.S"));
 
 #[no_mangle]
 fn rust_main() {
