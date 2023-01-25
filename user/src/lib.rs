@@ -34,7 +34,7 @@ fn clear_bss() {
 
 use syscall::*;
 
-pub fn write(fd: usize, buf: &[u8]) -> isize {
+pub fn write(fd: usize, buf: &[u8]) -> usize {
     sys_write(fd, buf)
 }
 

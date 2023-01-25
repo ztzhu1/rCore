@@ -3,7 +3,7 @@ use core::arch::asm;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT:  usize = 93;
 
-fn syscall(which: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
+fn syscall(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret;
     unsafe {
         asm!(
@@ -17,7 +17,7 @@ fn syscall(which: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
     ret
 }
 
-pub fn sys_write(fd: usize, buf: &[u8]) -> isize {
+pub fn sys_write(fd: usize, buf: &[u8]) -> usize {
     syscall(SYS_WRITE, fd, buf.as_ptr() as usize, buf.len())
 }
 
