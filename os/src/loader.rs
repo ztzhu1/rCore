@@ -10,7 +10,7 @@ const MAX_NUM_APP: usize = 6;
 const APP_BASE_ADDRESS: usize = 0x80400000;
 const APP_SIZE_LIMIT: usize = 0x20000;
 const KERNEL_STACK_SIZE: usize = 4096 * 2;
-const USER_STACK_SIZE: usize = 4096;
+const USER_STACK_SIZE: usize = 4096 * 2;
 
 #[repr(align(4096))]
 #[derive(Clone, Copy)]
