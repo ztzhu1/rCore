@@ -1,9 +1,10 @@
-use crate::{syscall::syscall, batch::run_next_app};
+use crate::{syscall::syscall};
 use super::context::TrapContext;
 use riscv::register::{
     scause::{self, Exception, Trap},
     stval, stvec,
 };
+use crate::task::exit_curr_and_run_next;
 
 #[no_mangle]
 pub fn trap_handler(context: &mut TrapContext) -> &mut TrapContext {
@@ -21,11 +22,11 @@ pub fn trap_handler(context: &mut TrapContext) -> &mut TrapContext {
         }
         Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {
             println!("[kernel] PageFault in application, kernel killed it.");
-            run_next_app();
+            exit_curr_and_run_next();
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
-            run_next_app();
+            exit_curr_and_run_next();
         }
         _ => {
             panic!(

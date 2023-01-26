@@ -5,14 +5,15 @@
 
 #[macro_use]
 mod console;
-mod batch;
 mod lang_items;
+mod loader;
 mod safe_refcell;
 mod sbi;
 mod syscall;
+mod task;
 mod trap;
 
-use core::arch::{global_asm, asm};
+use core::arch::{asm, global_asm};
 
 global_asm!(include_str!("entry.S"));
 global_asm!(include_str!("link_app.S"));
@@ -22,7 +23,7 @@ fn rust_main() {
     clear_bss();
     print_addr_info();
     trap::init();
-    batch::run_all_apps();
+    task::run_first_task();
     sbi::exit_success();
 }
 
@@ -34,7 +35,7 @@ fn clear_bss() {
     (sbss as usize..ebss as usize).for_each(|x| unsafe {
         (x as *mut u8).write_volatile(0);
     });
-    println!("bss cleared.");
+    println!("[kernel] bss cleared.");
 }
 
 fn print_addr_info() {
@@ -54,21 +55,21 @@ fn print_addr_info() {
         fn sbss(); // start addr of BSS segment
         fn ebss(); // end addr of BSS segment
     }
-    println!("RustSBI-QEMU booted successfully!");
-    println!(".text   [{:#x}, {:#x})", stext as usize, etext as usize);
-    println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
-    println!(".data   [{:#x}, {:#x})", sdata as usize, edata as usize);
+    println!("[kernel] RustSBI-QEMU booted successfully!");
+    println!("[kernel] .text   [{:#x}, {:#x})", stext as usize, etext as usize);
+    println!("[kernel] .rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
+    println!("[kernel] .data   [{:#x}, {:#x})", sdata as usize, edata as usize);
     println!(
-        "boot_stack    [{:#x}, {:#x})",
+        "[kernel] boot_stack    [{:#x}, {:#x})",
         boot_stack_lower_bound as usize, boot_stack_upper_bound as usize
     );
     println!(
-        "kernel_stack  [{:#x}, {:#x})",
+        "[kernel] kernel_stack  [{:#x}, {:#x})",
         skstack as usize, ekstack as usize
     );
     println!(
-        "user_stack    [{:#x}, {:#x})",
+        "[kernel] user_stack    [{:#x}, {:#x})",
         sustack as usize, eustack as usize
     );
-    println!(".bss    [{:#x}, {:#x})", sbss as usize, ebss as usize);
+    println!("[kernel] .bss    [{:#x}, {:#x})", sbss as usize, ebss as usize);
 }

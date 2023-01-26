@@ -18,7 +18,7 @@ __alltraps:
      * After this, we have switched from
      * user stack to kernel stack. And
      * sscratch helps us remember the
-     * original value of sp (i.e., user stack).
+     * original value of sp (e.g. user stack).
      */
     csrrw sp, sscratch, sp // sp <-> sscratch
 
@@ -72,7 +72,7 @@ __alltraps:
  *   2. starting to run an app
  */
 __restore:
-    mv sp, a0 // usage: __restore(&context)
+    # mv sp, a0
 
     ld t0, 32 * 8(sp)
     ld t1, 33 * 8(sp)

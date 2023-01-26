@@ -41,3 +41,7 @@ pub fn write(fd: usize, buf: &[u8]) -> usize {
 pub fn exit(exit_code: i32) -> ! {
     sys_exit(exit_code);
 }
+
+pub fn yield_() {
+    sys_yield();
+}
