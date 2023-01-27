@@ -3,6 +3,7 @@ use core::arch::asm;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT:  usize = 93;
 const SYS_YIELD: usize = 124;
+const SYS_GET_TIME: usize = 169;
 
 fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
     let mut ret: usize;
@@ -29,4 +30,8 @@ pub fn sys_exit(exit_code: i32) -> ! {
 
 pub fn sys_yield() {
     syscall(SYS_YIELD, 0, 0, 0);
+}
+
+pub fn sys_get_time() {
+    syscall(SYS_GET_TIME, 0, 0, 0);
 }

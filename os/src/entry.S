@@ -2,7 +2,7 @@
 .global _start
 _start:
     la sp, boot_stack_upper_bound
-    jal rust_main
+    jal os_main
 
 .section .bss.bstack
 .global boot_stack_lower_bound

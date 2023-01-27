@@ -11,6 +11,7 @@ mod safe_refcell;
 mod sbi;
 mod syscall;
 mod task;
+mod timer;
 mod trap;
 
 use core::arch::{asm, global_asm};
@@ -19,10 +20,12 @@ global_asm!(include_str!("entry.S"));
 global_asm!(include_str!("link_app.S"));
 
 #[no_mangle]
-fn rust_main() {
+fn os_main() {
     clear_bss();
     print_addr_info();
     trap::init();
+    trap::enable_timer_interrupt();
+    timer::set_next_trigger();
     task::run_first_task();
     sbi::exit_success();
 }
@@ -56,9 +59,18 @@ fn print_addr_info() {
         fn ebss(); // end addr of BSS segment
     }
     println!("[kernel] RustSBI-QEMU booted successfully!");
-    println!("[kernel] .text   [{:#x}, {:#x})", stext as usize, etext as usize);
-    println!("[kernel] .rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
-    println!("[kernel] .data   [{:#x}, {:#x})", sdata as usize, edata as usize);
+    println!(
+        "[kernel] .text   [{:#x}, {:#x})",
+        stext as usize, etext as usize
+    );
+    println!(
+        "[kernel] .rodata [{:#x}, {:#x})",
+        srodata as usize, erodata as usize
+    );
+    println!(
+        "[kernel] .data   [{:#x}, {:#x})",
+        sdata as usize, edata as usize
+    );
     println!(
         "[kernel] boot_stack    [{:#x}, {:#x})",
         boot_stack_lower_bound as usize, boot_stack_upper_bound as usize
@@ -71,5 +83,8 @@ fn print_addr_info() {
         "[kernel] user_stack    [{:#x}, {:#x})",
         sustack as usize, eustack as usize
     );
-    println!("[kernel] .bss    [{:#x}, {:#x})", sbss as usize, ebss as usize);
+    println!(
+        "[kernel] .bss    [{:#x}, {:#x})",
+        sbss as usize, ebss as usize
+    );
 }

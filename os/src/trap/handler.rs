@@ -1,10 +1,11 @@
-use crate::{syscall::syscall};
 use super::context::TrapContext;
+use crate::syscall::syscall;
+use crate::task::{exit_curr_and_run_next, suspend_curr_and_run_next};
+use crate::timer::set_next_trigger;
 use riscv::register::{
-    scause::{self, Exception, Trap},
+    scause::{self, Exception, Interrupt, Trap},
     stval, stvec,
 };
-use crate::task::exit_curr_and_run_next;
 
 #[no_mangle]
 pub fn trap_handler(context: &mut TrapContext) -> &mut TrapContext {
@@ -27,6 +28,11 @@ pub fn trap_handler(context: &mut TrapContext) -> &mut TrapContext {
         Trap::Exception(Exception::IllegalInstruction) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
             exit_curr_and_run_next();
+        }
+        Trap::Interrupt(Interrupt::SupervisorTimer) => {
+            println!("[kernel] timer interrupt: yield.");
+            set_next_trigger();
+            suspend_curr_and_run_next();
         }
         _ => {
             panic!(

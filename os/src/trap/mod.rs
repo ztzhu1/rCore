@@ -1,6 +1,6 @@
 use core::arch::global_asm;
 use riscv::register::mtvec::TrapMode;
-use riscv::register::stvec;
+use riscv::register::{stvec, sie};
 
 global_asm!(include_str!("trap.S"));
 
@@ -11,6 +11,12 @@ pub fn init() {
     }
     unsafe {
         stvec::write(__alltraps as usize, TrapMode::Direct);
+    }
+}
+
+pub fn enable_timer_interrupt() {
+    unsafe {
+        sie::set_stimer();
     }
 }
 

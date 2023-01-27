@@ -51,3 +51,7 @@ pub fn exit_success() -> ! {
 pub fn exit_failure() -> ! {
     shutdown(EXIT_FAILURE);
 }
+
+pub fn set_timer(timer: usize) {
+    sbi_call(SBI_SET_TIMER, timer, 0, 0);
+}
