@@ -39,7 +39,8 @@ pub fn console_getchar() -> usize {
 }
 
 fn shutdown(ecode: usize) -> ! {
-    println!("RustSBI-QEMU shutdown!\nexit code: {}", ecode);
+    kernel!("RustSBI-QEMU shutdown!");
+    kernel!("exit code: {}", ecode);
     sbi_call(SBI_SHUTDOWN, ecode, 0, 0);
     panic!("It should shutdown!");
 }

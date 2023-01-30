@@ -2,19 +2,26 @@
 #![no_main]
 #![allow(unused)]
 #![feature(panic_info_message)]
+#![feature(alloc_error_handler)]
 
 #[macro_use]
 mod console;
 mod lang_items;
 mod loader;
+mod mm;
 mod safe_refcell;
 mod sbi;
 mod syscall;
 mod task;
 mod timer;
 mod trap;
+#[macro_use]
+extern crate bitflags;
+extern crate alloc;
 
 use core::arch::{asm, global_asm};
+use alloc::vec;
+use mm::heap_allocator::{heap_test, init_heap};
 
 global_asm!(include_str!("entry.S"));
 global_asm!(include_str!("link_app.S"));
@@ -24,6 +31,9 @@ fn os_main() {
     clear_bss();
     print_addr_info();
     trap::init();
+    init_heap();
+    // heap_test();
+    // mm::frame_allocator::frame_allocator_test();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     task::run_first_task();
@@ -38,7 +48,7 @@ fn clear_bss() {
     (sbss as usize..ebss as usize).for_each(|x| unsafe {
         (x as *mut u8).write_volatile(0);
     });
-    println!("[kernel] bss cleared.");
+    kernel!("bss cleared.");
 }
 
 fn print_addr_info() {
@@ -58,33 +68,33 @@ fn print_addr_info() {
         fn sbss(); // start addr of BSS segment
         fn ebss(); // end addr of BSS segment
     }
-    println!("[kernel] RustSBI-QEMU booted successfully!");
-    println!(
-        "[kernel] .text   [{:#x}, {:#x})",
+    kernel!("RustSBI-QEMU booted successfully!");
+    kernel!(
+        ".text   [{:#x}, {:#x})",
         stext as usize, etext as usize
     );
-    println!(
-        "[kernel] .rodata [{:#x}, {:#x})",
+    kernel!(
+        ".rodata [{:#x}, {:#x})",
         srodata as usize, erodata as usize
     );
-    println!(
-        "[kernel] .data   [{:#x}, {:#x})",
+    kernel!(
+        ".data   [{:#x}, {:#x})",
         sdata as usize, edata as usize
     );
-    println!(
-        "[kernel] boot_stack    [{:#x}, {:#x})",
+    kernel!(
+        "boot_stack    [{:#x}, {:#x})",
         boot_stack_lower_bound as usize, boot_stack_upper_bound as usize
     );
-    println!(
-        "[kernel] kernel_stack  [{:#x}, {:#x})",
+    kernel!(
+        "kernel_stack  [{:#x}, {:#x})",
         skstack as usize, ekstack as usize
     );
-    println!(
-        "[kernel] user_stack    [{:#x}, {:#x})",
+    kernel!(
+        "user_stack    [{:#x}, {:#x})",
         sustack as usize, eustack as usize
     );
-    println!(
-        "[kernel] .bss    [{:#x}, {:#x})",
+    kernel!(
+        ".bss    [{:#x}, {:#x})",
         sbss as usize, ebss as usize
     );
 }

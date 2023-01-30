@@ -81,7 +81,7 @@ impl TaskManager {
         }
 
         if next_id == -1 {
-            println!("No more apps!");
+            info!("No more apps!");
             exit_success();
 
         }

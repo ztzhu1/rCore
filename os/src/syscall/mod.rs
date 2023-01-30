@@ -52,7 +52,7 @@ fn sys_yield() -> usize {
 }
 
 fn sys_exit(exit_code: usize) -> ! {
-    println!("[kernel] Application exited with code {}", exit_code as isize);
+    info!("Application exited with code {}", exit_code as isize);
     exit_curr_and_run_next();
     panic!("Unreachable in sys_exit!");
 }

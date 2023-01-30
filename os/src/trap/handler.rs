@@ -22,15 +22,15 @@ pub fn trap_handler(context: &mut TrapContext) -> &mut TrapContext {
             );
         }
         Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {
-            println!("[kernel] PageFault in application, kernel killed it.");
+            info!("PageFault in application, kernel killed it.");
             exit_curr_and_run_next();
         }
         Trap::Exception(Exception::IllegalInstruction) => {
-            println!("[kernel] IllegalInstruction in application, kernel killed it.");
+            info!("IllegalInstruction in application, kernel killed it.");
             exit_curr_and_run_next();
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            println!("[kernel] timer interrupt: yield.");
+            info!("timer interrupt: yield.");
             set_next_trigger();
             suspend_curr_and_run_next();
         }
