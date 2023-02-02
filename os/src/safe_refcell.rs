@@ -1,13 +1,13 @@
-use core::cell::{Ref, RefMut, RefCell};
+use core::cell::{Ref, RefCell, RefMut};
 
 pub struct SafeRefCell<T> {
-    inner: RefCell<T>
+    inner: RefCell<T>,
 }
 
 impl<T> SafeRefCell<T> {
     pub fn new(value: T) -> Self {
         Self {
-            inner: RefCell::new(value)
+            inner: RefCell::new(value),
         }
     }
 

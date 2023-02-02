@@ -1,16 +1,8 @@
 #![allow(non_camel_case_types)]
 
 use super::page_table::PageTableEntry;
+use crate::config::*;
 use core::fmt::{self, Debug, Formatter};
-
-pub const OFFSET_WIDTH: usize = 12;
-pub const PAGE_SIZE: usize = 4096;
-const PTE_SIZE: usize = core::mem::size_of::<PageTableEntry>();
-const PTE_NUM: usize = PAGE_SIZE / PTE_SIZE;
-const PA_WIDTH_SV39: usize = 56;
-const VA_WIDTH_SV39: usize = 39;
-const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - OFFSET_WIDTH;
-const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - OFFSET_WIDTH;
 
 pub type offset_t = usize;
 pub type ppn_t = usize;

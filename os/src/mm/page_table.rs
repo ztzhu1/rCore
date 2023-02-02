@@ -44,6 +44,14 @@ impl PageTableEntry {
     pub fn is_valid(&self) -> bool {
         (self.flags() & PTEFlags::V).bits as usize != 0
     }
+
+    pub fn writable(&self) -> bool {
+        (self.flags() & PTEFlags::W).bits as usize != 0
+    }
+
+    pub fn executable(&self) -> bool {
+        (self.flags() & PTEFlags::X).bits as usize != 0
+    }
 }
 
 pub struct PageTable {
@@ -60,6 +68,18 @@ impl PageTable {
         }
     }
 
+    pub fn empty() -> Self {
+        Self {
+            root_ppn: 0,
+            frames: Vec::new(),
+        }
+    }
+
+    /**
+     * PageTable only saves index_frame. The caller is
+     * responsible for saving data_frame and passing ppn
+     * to PageTable::map.
+     */
     pub fn map(&mut self, vpn: vpn_t, ppn: ppn_t, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).expect("loop zero times!");
         assert!(!pte.is_valid());
@@ -115,6 +135,10 @@ impl PageTable {
             paddr = PhysAddr::from_ppn(pte.ppn());
         }
         result
+    }
+
+    pub fn token(&self) -> usize {
+        8usize << 60 | self.root_ppn
     }
 
     pub fn from_token(satp: usize) -> Self {

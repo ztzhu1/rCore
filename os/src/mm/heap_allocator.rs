@@ -1,3 +1,5 @@
+use crate::ext::{ebss, sbss};
+
 use buddy_system_allocator::LockedHeap;
 
 const KERNEL_HEAP_SIZE: usize = 0x00_300_000;
@@ -24,10 +26,6 @@ pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
 pub fn heap_test() {
     use alloc::boxed::Box;
     use alloc::vec::Vec;
-    extern "C" {
-        fn sbss();
-        fn ebss();
-    }
     let bss_range = sbss as usize..ebss as usize;
     let a = Box::new(5);
     assert_eq!(*a, 5);

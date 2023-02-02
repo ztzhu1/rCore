@@ -8,29 +8,18 @@
     ld x\n, 8 * \n(sp)
 .endm
 
-.section .text
+.section .text.trampoline
 .global __alltraps
+.global __restore
 .align 2
 __alltraps:
-    /**
-     * At the beginnig, sp->user_stack, sscratch->kernel_stack.
-     * Use csrrw to swap the values.
-     * After this, we have switched from
-     * user stack to kernel stack. And
-     * sscratch helps us remember the
-     * original value of sp (e.g. user stack).
-     */
     csrrw sp, sscratch, sp // sp <-> sscratch
 
-    //-------now we are on kernel stack-----
-    /**
-     * Allocate space
-     */
-    addi sp, sp, -34 * 8
+    //-------now sp->*TrapContext-----
     /**
      * store all gp regs.
      */
-    sd ra, 8(sp) // x1 is ra.
+    sd ra, 8(sp) // ra is x1.
     // We won't save sp since it was already
     // changed above.
     // Instead, we save `sscratch`, which stored
@@ -57,47 +46,45 @@ __alltraps:
     sd t0, 32 * 8(sp)
     sd t1, 33 * 8(sp)
     sd t2, 2 * 8(sp) // x2 is (user)sp
-    /**
-     * Pass sp as the first arg to trap_handler.
-     */
-    mv a0, sp
-    jal trap_handler
+    // load kernel_satp into t0
+    ld t0, 34 * 8(sp)
+    // load trap_handler into t1
+    ld t1, 36 * 8(sp)
+    // move to kernel_sp
+    ld sp, 35 * 8(sp)
+    // switch to kernel space
+    csrw satp, t0
+    sfence.vma
+    // jump to trap_handler
+    jr t1
 
-.section .text
-.global __restore
-.align 2
 /**
  * This function can be used when:
  *   1. recovering from trap.
  *   2. starting to run an app
  */
 __restore:
-    # mv sp, a0
+    #  a0: *TrapContext in user space(Constant); a1: user space token
+    # switch to user space
+    csrw satp, a1
+    sfence.vma
 
+    csrw sscratch, a0
+    mv sp, a0
+    # now sp points to TrapContext in user space, start restoring based on it
+    # restore sstatus/sepc
     ld t0, 32 * 8(sp)
     ld t1, 33 * 8(sp)
-    ld t2, 2 * 8(sp) // x2 is (user)sp
     csrw sstatus, t0
     csrw sepc, t1
-    csrw sscratch, t2
 
-    ld ra, 8(sp) // x1 is ra.
+    # restore general purpose registers except x0/sp/tp
+    ld x1, 1 * 8(sp)
     .set n, 3
     .rept 29
         LOAD_GP %n
         .set n, n + 1
     .endr
-
-    addi sp, sp, 34 * 8
-
-    /** After executing this instruction,
-     * sp->user_stack
-     * sscratch->kernel_stack
-     */
-    csrrw sp, sscratch, sp // sp <-> sscratch
-
-    /**
-     * return from S mode to U mode
-     */
+    # back to user stack
+    ld sp, 2 * 8(sp)
     sret
-    

@@ -23,11 +23,12 @@ SECTIONS
         *(.sdata .sdata.*)
     }
 
+    sbss = .;
     .bss : {
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }
-    . = ALIGN(4K);
+    ebss = .;
     
     /DISCARD/ : {
         *(.eh_frame)

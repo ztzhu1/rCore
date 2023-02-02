@@ -38,14 +38,6 @@ SECTIONS
     sbss_with_stack = .;
     .bss : {
         *(.bss.bstack)
-        
-        skstack = .;
-        *(.bss.kstack)
-        ekstack = .;
-
-        sustack = .;
-        *(.bss.ustack)
-        eustack = .;
 
         sbss = .;
         *(.bss .bss.*)

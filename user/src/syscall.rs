@@ -32,6 +32,7 @@ pub fn sys_yield() {
     syscall(SYS_YIELD, 0, 0, 0);
 }
 
+#[allow(unused)]
 pub fn sys_get_time() {
     syscall(SYS_GET_TIME, 0, 0, 0);
 }

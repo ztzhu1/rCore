@@ -1,5 +1,8 @@
+use crate::mm::address::VirtAddr;
+use crate::mm::page_table::PageTable;
 use crate::sbi::console_putchar;
-use crate::task::{suspend_curr_and_run_next, exit_curr_and_run_next};
+use crate::task::vaddr_to_paddr;
+use crate::task::{current_user_token, exit_curr_and_run_next, suspend_curr_and_run_next};
 use crate::timer::get_time_ms;
 
 const SYS_WRITE: usize = 64;
@@ -27,8 +30,14 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     ret
 }
 
+fn vbuf_to_pbuf(buf: usize) -> usize {
+    let vaddr = VirtAddr::from(buf);
+    vaddr_to_paddr(vaddr).0
+}
+
 fn sys_write(fd: usize, buf: usize, len: usize) -> usize {
     let mut count = 0_usize;
+    let buf = vbuf_to_pbuf(buf);
     let begin = buf as *const u8;
     unsafe {
         loop {

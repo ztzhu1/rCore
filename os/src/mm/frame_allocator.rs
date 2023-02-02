@@ -1,11 +1,12 @@
 use super::address::*;
-use crate::{lang_items, safe_refcell::SafeRefCell};
+use crate::config::{MEMORY_END, PAGE_SIZE};
+use crate::lang_items;
+use crate::safe_refcell::SafeRefCell;
+
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use lazy_static::lazy_static;
-
-pub const MEMORY_END: usize = 0x80800000;
 
 trait FrameAllocator {
     fn new() -> Self;
@@ -86,12 +87,9 @@ impl Debug for FrameTracker {
 
 lazy_static! {
     static ref STACK_FRAME_ALLOCATOR: SafeRefCell<StackFrameAllocator> = SafeRefCell::new({
-        extern "C" {
-            fn ekernel();
-        }
         let mut sfa = StackFrameAllocator::new();
         sfa.init(
-            PhysAddr::from(ekernel as usize).ceil(),
+            PhysAddr::from(MEMORY_START!()).ceil(),
             PhysAddr::from(MEMORY_END).floor(),
         );
         sfa
@@ -99,9 +97,9 @@ lazy_static! {
 }
 
 pub fn frame_alloc() -> Option<FrameTracker> {
-    Some(FrameTracker {
-        ppn: STACK_FRAME_ALLOCATOR.borrow_mut().alloc()?,
-    })
+    Some(FrameTracker::new(
+        STACK_FRAME_ALLOCATOR.borrow_mut().alloc()?,
+    ))
 }
 
 fn frame_dealloc(ppn: ppn_t) {

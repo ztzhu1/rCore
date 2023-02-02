@@ -1,11 +1,14 @@
 use super::switch::__switch;
 use super::tcb::{TaskContext, TaskControlBlock, TaskStatus};
-use crate::loader::{app_num, init_app, examine_app_id_valid};
+use crate::apply_mask;
+use crate::config::MAX_TASK_NUM;
+use crate::loader::{app_num, examine_app_id_valid, init_tcb};
+use crate::mm::address::{PhysAddr, VirtAddr};
 use crate::safe_refcell::SafeRefCell;
-use lazy_static::lazy_static;
 use crate::sbi::exit_success;
-
-const MAX_TASK_NUM: usize = 6;
+use crate::trap::TrapContext;
+use alloc::vec::Vec;
+use lazy_static::lazy_static;
 
 macro_rules! break_if_match {
     ($inst: ident, $next_id: ident, $id: ident) => {
@@ -23,7 +26,7 @@ pub struct TaskManager {
 
 pub struct TaskManagerInner {
     curr_task: usize,
-    tcbs: [TaskControlBlock; MAX_TASK_NUM],
+    tcbs: Vec<TaskControlBlock>,
 }
 
 impl TaskManager {
@@ -83,7 +86,6 @@ impl TaskManager {
         if next_id == -1 {
             info!("No more apps!");
             exit_success();
-
         }
 
         let next_id = next_id as usize;
@@ -99,19 +101,39 @@ impl TaskManager {
             __switch(curr_task_cx, target_task_cx);
         }
     }
+
+    fn get_current_token(&self) -> usize {
+        let inner = self.inner.borrow();
+        let current = inner.curr_task;
+        inner.tcbs[current].get_user_token()
+    }
+
+    fn get_current_trap_cx(&self) -> &mut TrapContext {
+        let inner = self.inner.borrow();
+        let current = inner.curr_task;
+        inner.tcbs[current].get_trap_cx()
+    }
+
+    pub fn vaddr_to_paddr(&self, vaddr: VirtAddr) -> PhysAddr {
+        let inner = self.inner.borrow();
+        let current = inner.curr_task;
+        PhysAddr::from(inner.tcbs[current].user_space.translate(vaddr.vpn()).0 + vaddr.offset())
+    }
 }
 
 lazy_static! {
     static ref TASK_MANAGER: TaskManager = {
-        let mut tcbs = [TaskControlBlock::empty(); MAX_TASK_NUM];
-        for app_id in 0..MAX_TASK_NUM {
-            tcbs[app_id] = init_app(app_id);
+        let n = app_num();
+        let mut tcbs = Vec::new();
+        for app_id in 0..n {
+            tcbs.push(init_tcb(app_id));
+            // tcbs[app_id] = init_tcb(app_id);
         }
         TaskManager {
-            task_num: app_num(),
+            task_num: n,
             inner: SafeRefCell::new(TaskManagerInner {
-                curr_task: 2,
-                tcbs: tcbs,
+                curr_task: 0,
+                tcbs,
             }),
         }
     };
@@ -129,4 +151,16 @@ pub fn exit_curr_and_run_next() {
 
 pub fn run_first_task() {
     TASK_MANAGER.run_first_task();
+}
+
+pub fn current_user_token() -> usize {
+    TASK_MANAGER.get_current_token()
+}
+
+pub fn current_trap_cx() -> &'static mut TrapContext {
+    TASK_MANAGER.get_current_trap_cx()
+}
+
+pub fn vaddr_to_paddr(vaddr: VirtAddr) -> PhysAddr {
+    TASK_MANAGER.vaddr_to_paddr(vaddr)
 }
