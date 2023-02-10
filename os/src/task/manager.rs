@@ -4,7 +4,7 @@ use crate::apply_mask;
 use crate::config::MAX_TASK_NUM;
 use crate::loader::{app_num, examine_app_id_valid, init_tcb};
 use crate::mm::address::{PhysAddr, VirtAddr};
-use crate::safe_refcell::SafeRefCell;
+use crate::safe_refcell::UPSafeRefCell;
 use crate::sbi::exit_success;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -21,7 +21,7 @@ macro_rules! break_if_match {
 
 pub struct TaskManager {
     task_num: usize,
-    inner: SafeRefCell<TaskManagerInner>,
+    inner: UPSafeRefCell<TaskManagerInner>,
 }
 
 pub struct TaskManagerInner {
@@ -131,7 +131,7 @@ lazy_static! {
         }
         TaskManager {
             task_num: n,
-            inner: SafeRefCell::new(TaskManagerInner {
+            inner: UPSafeRefCell::new(TaskManagerInner {
                 curr_task: 0,
                 tcbs,
             }),

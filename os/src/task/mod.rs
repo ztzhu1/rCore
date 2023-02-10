@@ -1,6 +1,7 @@
 mod manager;
 mod switch;
 mod tcb;
+pub mod pid;
 
 pub use manager::{
     current_trap_cx, current_user_token, exit_curr_and_run_next, run_first_task,

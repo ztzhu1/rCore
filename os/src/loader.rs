@@ -2,7 +2,8 @@ use crate::config::*;
 use crate::ext::_num_app;
 use crate::mm::address::{PhysAddr, VirtAddr};
 use crate::mm::memory_set::{MapPermission, MemorySet, KERNEL_SPACE};
-use crate::safe_refcell::SafeRefCell;
+use crate::safe_refcell::UPSafeRefCell;
+use crate::task::pid::KernelStack;
 use crate::task::{TaskContext, TaskControlBlock, TaskStatus};
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -15,16 +16,20 @@ pub fn examine_app_id_valid(app_id: usize) {
     }
 }
 
-/// Assume `app_id` is valid.
-fn create_app_kernel_stack(app_id: usize) -> (usize, usize) {
-    let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+pub fn kstack_position(pid: usize) -> (usize, usize) {
+    let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
     let bottom = top - KERNEL_STACK_SIZE;
+    (bottom, top)
+}
+
+pub fn create_app_kernel_stack(pid: usize) -> KernelStack {
+    let (bottom, top) = kstack_position(pid);
     KERNEL_SPACE.borrow_mut().insert_framed_area(
         bottom.into(),
         top.into(),
         MapPermission::R | MapPermission::W,
     );
-    (bottom, top)
+    KernelStack { pid, bottom, top }
 }
 
 pub fn init_tcb(app_id: usize) -> TaskControlBlock {
@@ -59,9 +64,8 @@ pub fn app_data(app_id: usize) -> &'static [u8] {
     }
 }
 
-pub fn app_data_by_name(app_name: &str)-> Option<&'static [u8]> {
-    let n = app_num();
-    let app_id = APP_NAMES.binary_search(&app_name).ok()?;
+pub fn app_data_by_name(app_name: &str) -> Option<&'static [u8]> {
+    let app_id = APP_NAMES.iter().position(|&name| name == app_name)?;
     Some(app_data(app_id))
 }
 
