@@ -3,7 +3,7 @@ use super::page_table::{PTEFlags, PageTable, PageTableEntry};
 use super::{address::*, page_table};
 use crate::config::*;
 use crate::ext::*;
-use crate::safe_refcell::SafeRefCell;
+use crate::safe_refcell::UPSafeRefCell;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -296,8 +296,8 @@ bitflags! {
 }
 
 lazy_static! {
-    pub static ref KERNEL_SPACE: Arc<SafeRefCell<MemorySet>> =
-        Arc::new(SafeRefCell::new(MemorySet::new_kernel()));
+    pub static ref KERNEL_SPACE: Arc<UPSafeRefCell<MemorySet>> =
+        Arc::new(UPSafeRefCell::new(MemorySet::new_kernel()));
 }
 
 pub fn remap_test() {

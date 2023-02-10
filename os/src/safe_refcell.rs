@@ -1,10 +1,10 @@
 use core::cell::{Ref, RefCell, RefMut};
 
-pub struct SafeRefCell<T> {
+pub struct UPSafeRefCell<T> {
     inner: RefCell<T>,
 }
 
-impl<T> SafeRefCell<T> {
+impl<T> UPSafeRefCell<T> {
     pub fn new(value: T) -> Self {
         Self {
             inner: RefCell::new(value),
@@ -20,4 +20,4 @@ impl<T> SafeRefCell<T> {
     }
 }
 
-unsafe impl<T> Sync for SafeRefCell<T> {}
+unsafe impl<T> Sync for UPSafeRefCell<T> {}

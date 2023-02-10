@@ -1,7 +1,7 @@
 use super::address::*;
 use crate::config::{MEMORY_END, PAGE_SIZE};
 use crate::lang_items;
-use crate::safe_refcell::SafeRefCell;
+use crate::safe_refcell::UPSafeRefCell;
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -86,7 +86,7 @@ impl Debug for FrameTracker {
 }
 
 lazy_static! {
-    static ref STACK_FRAME_ALLOCATOR: SafeRefCell<StackFrameAllocator> = SafeRefCell::new({
+    static ref STACK_FRAME_ALLOCATOR: UPSafeRefCell<StackFrameAllocator> = UPSafeRefCell::new({
         let mut sfa = StackFrameAllocator::new();
         sfa.init(
             PhysAddr::from(MEMORY_START!()).ceil(),
