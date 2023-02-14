@@ -2,7 +2,7 @@ use core::arch::asm;
 
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
-const SYS_EXIT:  usize = 93;
+const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
 const SYS_GET_TIME: usize = 169;
 const SYS_FORK: usize = 220;

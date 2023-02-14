@@ -12,9 +12,6 @@ pub const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - OFFSET_WIDTH;
 pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - OFFSET_WIDTH;
 
 /// stack
-pub const MAX_NUM_APP: usize = 6;
-pub const APP_BASE_ADDRESS: usize = 0x80400000;
-pub const APP_SIZE_LIMIT: usize = 0x20000;
 pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
 pub const USER_STACK_SIZE: usize = 4096 * 2;
 
@@ -25,9 +22,7 @@ pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 #[macro_export]
 macro_rules! MEMORY_START {
     () => {
-        crate::ext::ekernel as usize
+        crate::ext::smemory as usize
     };
 }
 pub const MEMORY_END: usize = 0x80800000;
-
-pub const MAX_TASK_NUM: usize = 6;

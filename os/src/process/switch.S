@@ -11,7 +11,7 @@
 .section .text
 .global __switch
 __switch:
-    # pub fn __switch(curr_task_cx: *mut TaskContext, target_task_cx: *const TaskContext);
+    # pub fn __switch(curr_proc_cx: *mut ProcessContext, curr_proc_cx: *const ProcessContext);
     sd ra, 0(a0)
     sd sp, 8(a0)
     .set n, 0

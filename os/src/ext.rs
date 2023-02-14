@@ -12,6 +12,7 @@ extern "C" {
     pub fn sbss();
     pub fn ebss();
     pub fn ekernel();
+    pub fn smemory();
 
     pub fn _num_app();
 }

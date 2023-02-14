@@ -1,5 +1,5 @@
 use super::handler::trap_handler;
-use crate::mm::memory_set::KERNEL_SPACE;
+use crate::mm::{address::VirtAddr, KERNEL_SPACE};
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
 #[repr(C)]
@@ -32,5 +32,10 @@ impl TrapContext {
 
     fn set_sp(&mut self, sp: usize) {
         self.gp[2] = sp;
+    }
+
+    pub fn app_init_context(entry_point: usize, user_sp: usize, kernel_stack_top: usize) -> Self {
+        let cx = Self::new(entry_point, user_sp, kernel_stack_top);
+        cx
     }
 }

@@ -1,10 +1,7 @@
 use crate::config::*;
 use crate::ext::_num_app;
 use crate::mm::address::{PhysAddr, VirtAddr};
-use crate::mm::memory_set::{MapPermission, MemorySet, KERNEL_SPACE};
 use crate::safe_refcell::UPSafeRefCell;
-use crate::task::pid::KernelStack;
-use crate::task::{TaskContext, TaskControlBlock, TaskStatus};
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
@@ -16,40 +13,6 @@ pub fn examine_app_id_valid(app_id: usize) {
     }
 }
 
-pub fn kstack_position(pid: usize) -> (usize, usize) {
-    let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
-    let bottom = top - KERNEL_STACK_SIZE;
-    (bottom, top)
-}
-
-pub fn create_app_kernel_stack(pid: usize) -> KernelStack {
-    let (bottom, top) = kstack_position(pid);
-    KERNEL_SPACE.borrow_mut().insert_framed_area(
-        bottom.into(),
-        top.into(),
-        MapPermission::R | MapPermission::W,
-    );
-    KernelStack { pid, bottom, top }
-}
-
-pub fn init_tcb(app_id: usize) -> TaskControlBlock {
-    if app_id >= app_num() {
-        return TaskControlBlock::empty();
-    }
-    // create app kernel stack
-    let (_, kernel_sp) = create_app_kernel_stack(app_id);
-    // create user space
-    let (user_space, user_sp, entry) = MemorySet::from_elf(app_data(app_id));
-    // init trap context
-    let trap_context = TrapContext::new(entry, user_sp, kernel_sp);
-
-    let trap_cx_addr = user_space.translate(VirtAddr::from(TRAP_CONTEXT).vpn());
-    unsafe {
-        (trap_cx_addr.0 as *mut TrapContext).write_volatile(trap_context);
-    }
-    let task_cx = TaskContext::from_goto_trap_return(kernel_sp);
-    TaskControlBlock::new(task_cx, user_space, trap_cx_addr.ppn(), user_sp)
-}
 
 pub fn app_num() -> usize {
     unsafe { (_num_app as *const usize).read_volatile() }
@@ -92,6 +55,7 @@ lazy_static! {
                 let name = core::str::from_utf8(name_slice).unwrap();
                 names.push(name);
                 start = end.add(1);
+                end = start;
             }
         }
         names

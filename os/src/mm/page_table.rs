@@ -1,8 +1,7 @@
-use crate::apply_mask;
-
-#[macro_use]
 use super::address::*;
 use super::frame_allocator::{frame_alloc, FrameTracker};
+use crate::apply_mask;
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -52,6 +51,14 @@ impl PageTableEntry {
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X).bits as usize != 0
     }
+
+    pub fn map(&mut self, ppn: ppn_t, flags: PTEFlags) {
+        *self = Self::new(ppn, flags);
+    }
+
+    pub fn unmap(&mut self) {
+        *self = Self::empty();
+    }
 }
 
 pub struct PageTable {
@@ -83,13 +90,13 @@ impl PageTable {
     pub fn map(&mut self, vpn: vpn_t, ppn: ppn_t, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).expect("loop zero times!");
         assert!(!pte.is_valid());
-        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+        pte.map(ppn, flags | PTEFlags::V);
     }
 
     pub fn unmap(&mut self, vpn: vpn_t) {
         let pte = self.find_pte(vpn).expect("loop zero times!");
         assert!(pte.is_valid());
-        *pte = PageTableEntry::empty();
+        pte.unmap();
     }
 
     pub fn find_pte_create(&mut self, vpn: vpn_t) -> Option<&mut PageTableEntry> {
@@ -105,7 +112,7 @@ impl PageTable {
             }
             if !pte.is_valid() {
                 let ft = frame_alloc().expect("No more free memory!");
-                *pte = PageTableEntry::new(ft.ppn, PTEFlags::V);
+                pte.map(ft.ppn, PTEFlags::V);
                 self.frames.push(ft);
             }
             paddr = PhysAddr::from_ppn(pte.ppn());
@@ -138,7 +145,11 @@ impl PageTable {
     }
 
     pub fn token(&self) -> usize {
-        8usize << 60 | self.root_ppn
+        // for RV64:
+        // satp[63:60] = 0 => bare
+        // satp[63:60] = 8 => Sv39
+        // satp[63:60] = 9 => Sv48
+        8_usize << 60 | self.root_ppn
     }
 
     pub fn from_token(satp: usize) -> Self {
@@ -149,6 +160,67 @@ impl PageTable {
     }
 
     pub fn translate(&self, vpn: vpn_t) -> Option<&PageTableEntry> {
-        Some(self.find_pte(vpn)?)
+        self.find_pte(vpn).map(|pte| &*pte)
     }
+
+    pub fn vaddr_to_paddr(&self, va: VirtAddr) -> Option<PhysAddr> {
+        self.find_pte(va.clone().floor()).map(|pte| {
+            //println!("translate_va:va = {:?}", va);
+            let aligned_pa: PhysAddr = PhysAddr::from_ppn(pte.ppn());
+            //println!("translate_va:pa_align = {:?}", aligned_pa);
+            (aligned_pa.0 + va.offset()).into()
+        })
+    }
+}
+
+/// translate a pointer to a mutable u8 Vec through page table
+pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
+    let page_table = PageTable::from_token(token);
+    let mut start = ptr as usize;
+    let end = start + len;
+    let mut v = Vec::new();
+    while start < end {
+        let start_va = VirtAddr::from(start);
+        let mut vpn = start_va.vpn();
+        let ppn = page_table.translate(vpn).unwrap().ppn();
+        vpn.step();
+        let mut end_va: VirtAddr = vpn.into();
+        end_va = end_va.min(VirtAddr::from(end));
+        if end_va.offset() == 0 {
+            v.push(&mut PhysAddr::from_ppn(ppn).get_bytes()[start_va.offset()..]);
+        } else {
+            v.push(&mut PhysAddr::from_ppn(ppn).get_bytes()[start_va.offset()..end_va.offset()]);
+        }
+        start = end_va.0;
+    }
+    v
+}
+
+pub fn translated_str(token: usize, ptr: *const u8) -> String {
+    let page_table = PageTable::from_token(token);
+    let mut string = String::new();
+    let mut va = ptr as usize;
+    loop {
+        let ch: u8;
+        unsafe {
+            ch = *(page_table.vaddr_to_paddr(VirtAddr::from(va)).unwrap().0 as *const u8);
+        }
+        if ch == 0 {
+            break;
+        } else {
+            string.push(ch as char);
+            va += 1;
+        }
+    }
+    string
+}
+
+///translate a generic through page table and return a mutable reference
+pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
+    //println!("into translated_refmut!");
+    let page_table = PageTable::from_token(token);
+    let va = ptr as usize;
+    //println!("translated_refmut: before translate_va");
+    let pa = page_table.vaddr_to_paddr(VirtAddr::from(va)).unwrap();
+    unsafe { (pa.0 as *mut T).as_mut().unwrap() }
 }

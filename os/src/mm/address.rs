@@ -115,7 +115,7 @@ impl VirtAddr {
     }
 
     pub fn ceil(&self) -> vpn_t {
-        (self.0 + (PAGE_SIZE - 1)) / PAGE_SIZE
+        (self.0 + (PAGE_SIZE - 1)) >> OFFSET_WIDTH
     }
 
     pub fn head(&self) -> Self {

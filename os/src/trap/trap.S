@@ -67,6 +67,7 @@ __restore:
     #  a0: *TrapContext in user space(Constant); a1: user space token
     # switch to user space
     csrw satp, a1
+    # clear TLB
     sfence.vma
 
     csrw sscratch, a0
@@ -79,7 +80,7 @@ __restore:
     csrw sepc, t1
 
     # restore general purpose registers except x0/sp/tp
-    ld x1, 1 * 8(sp)
+    ld ra, 1 * 8(sp)
     .set n, 3
     .rept 29
         LOAD_GP %n

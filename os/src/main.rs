@@ -12,10 +12,10 @@ mod ext;
 mod lang_items;
 mod loader;
 mod mm;
+mod process;
 mod safe_refcell;
 mod sbi;
 mod syscall;
-mod task;
 mod timer;
 mod trap;
 #[macro_use]
@@ -23,8 +23,11 @@ extern crate bitflags;
 extern crate alloc;
 
 use alloc::vec;
+use mm::address_space::remap_test;
 use core::arch::{asm, global_asm};
 use ext::*;
+
+use crate::config::MEMORY_END;
 
 global_asm!(include_str!("entry.S"));
 global_asm!(include_str!("link_app.S"));
@@ -33,11 +36,16 @@ global_asm!(include_str!("link_app.S"));
 fn os_main() {
     clear_bss();
     print_addr_info();
+
     trap::init();
+    // Sv39 paging
     mm::init();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
-    task::run_first_task();
+
+    // trap::enable_timer_interrupt();
+    // timer::set_next_trigger();
+    process::add_initproc();
+    process::processor::run_procs();
+    // remap_test();
     sbi::exit_success();
 }
 
@@ -59,4 +67,10 @@ fn print_addr_info() {
         boot_stack_upper_bound as usize
     );
     kernel!(".bss    [{:#x}, {:#x})", sbss as usize, ebss as usize);
+    kernel!(
+        "memory  [{:#x}, {:#x}) ({} KiB)",
+        MEMORY_START!() as usize,
+        MEMORY_END as usize,
+        (MEMORY_END - MEMORY_START!()) / 1024
+    );
 }

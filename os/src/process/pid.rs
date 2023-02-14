@@ -1,8 +1,9 @@
 use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE};
+use crate::mm::address::VirtAddr;
+use crate::mm::KERNEL_SPACE;
 use crate::safe_refcell::UPSafeRefCell;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use crate::loader::create_app_kernel_stack;
 
 // --------- PidHandle -------
 pub struct PidHandle(pub usize);
@@ -50,21 +51,3 @@ lazy_static! {
 pub fn pid_alloc() -> PidHandle {
     PID_ALLOCATOR.borrow_mut().alloc()
 }
-
-// --------- KernelStack -------
-pub struct KernelStack {
-    pid: usize,
-    bottom: usize,
-    top: usize,
-}
-
-impl KernelStack {
-    pub fn new(pid_handle: &PidHandle) -> Self {
-        create_app_kernel_stack(pid_handle.0)
-    }
-
-    pub fn get_top(&self) -> usize {
-        self.top
-    }
-}
-

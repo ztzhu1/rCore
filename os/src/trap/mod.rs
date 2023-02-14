@@ -36,4 +36,4 @@ pub fn trap_from_kernel() -> ! {
 mod context;
 mod handler;
 pub use context::TrapContext;
-pub use handler::trap_return;
+pub use handler::{trap_handler, trap_return};

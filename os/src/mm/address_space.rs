@@ -3,13 +3,12 @@ use super::page_table::{PTEFlags, PageTable, PageTableEntry};
 use super::{address::*, page_table};
 use crate::config::*;
 use crate::ext::*;
-use crate::safe_refcell::UPSafeRefCell;
+use crate::mm::KERNEL_SPACE;
 
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::arch::asm;
-use lazy_static::lazy_static;
+use core::clone::Clone;
 use riscv::register::satp;
 use xmas_elf;
 
@@ -27,6 +26,7 @@ impl MapArea {
         map_type: MapType,
         map_perm: MapPermission,
     ) -> Self {
+        assert!(va_start.aligned());
         let vpn_start = va_start.floor();
         let vpn_end = va_end.ceil();
         Self {
@@ -91,13 +91,23 @@ impl MapArea {
     }
 }
 
-/// A `MemorySet` is an address space.
-pub struct MemorySet {
+impl Clone for MapArea {
+    fn clone(&self) -> Self {
+        Self {
+            vpn_range: VPNRange::new(self.vpn_range.get_start(), self.vpn_range.get_end()),
+            data_frames: BTreeMap::new(),
+            map_type: self.map_type,
+            map_perm: self.map_perm,
+        }
+    }
+}
+
+pub struct AddressSpace {
     page_table: PageTable,
     areas: Vec<MapArea>,
 }
 
-impl MemorySet {
+impl AddressSpace {
     pub fn new() -> Self {
         Self {
             page_table: PageTable::new(),
@@ -120,6 +130,14 @@ impl MemorySet {
         }
     }
 
+    pub fn recycle_data_frames(&mut self) {
+        self.areas.clear();
+    }
+
+    pub fn vaddr_to_paddr(&self, vaddr: VirtAddr) -> Option<PhysAddr> {
+        self.page_table.vaddr_to_paddr(vaddr)
+    }
+
     pub fn translate(&self, vpn: vpn_t) -> PhysAddr {
         PhysAddr::from_ppn(self.page_table.translate(vpn).unwrap().ppn())
     }
@@ -130,6 +148,24 @@ impl MemorySet {
             map_area.copy_data(&mut self.page_table, data);
         }
         self.areas.push(map_area);
+    }
+
+    pub fn from_user_space(user_space: &Self) -> Self {
+        let mut new_user_space = Self::empty();
+        // map trampoline
+        new_user_space.map_trampoline();
+        // copy data sections/trap_context/user_stack
+        for area in user_space.areas.iter() {
+            let new_area = area.clone();
+            new_user_space.push(new_area, None);
+            // copy data from another space
+            for vpn in area.vpn_range {
+                let src = user_space.translate(vpn).get_bytes();
+                let dst = new_user_space.translate(vpn).get_bytes();
+                dst.copy_from_slice(src);
+            }
+        }
+        new_user_space
     }
 
     /// Assume that no conflicts.
@@ -159,8 +195,8 @@ impl MemorySet {
 
     /// Create app address space.
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
-        let mut memory_set = Self::new();
-        memory_set.map_trampoline();
+        let mut user_space = Self::new();
+        user_space.map_trampoline();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -186,7 +222,7 @@ impl MemorySet {
                 }
                 let map_area = MapArea::new(start_va, end_va, MapType::FRAMED, map_perm);
                 max_end_vpn = map_area.vpn_range.get_end();
-                memory_set.push(
+                user_space.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
                 );
@@ -197,20 +233,23 @@ impl MemorySet {
         let mut user_stack_bottom: usize = max_end_va.vpn();
         // guard page
         user_stack_bottom += PAGE_SIZE;
+        // user stack
+        user_stack_bottom  = VirtAddr::from_vpn(VirtAddr::from(user_stack_bottom).ceil()).0; // align
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        memory_set.insert_framed_area(
+        user_space.insert_framed_area(
             user_stack_bottom.into(),
             user_stack_top.into(),
             MapPermission::R | MapPermission::W | MapPermission::U,
         );
         // map TrapContext
-        memory_set.insert_framed_area(
+        user_space.insert_framed_area(
             TRAP_CONTEXT.into(),
             TRAMPOLINE.into(),
             MapPermission::R | MapPermission::W,
         );
+
         (
-            memory_set,
+            user_space,
             user_stack_top,
             elf.header.pt2.entry_point() as usize,
         )
@@ -218,30 +257,30 @@ impl MemorySet {
 
     /// Create kernel address space.
     pub fn new_kernel() -> Self {
-        let mut memory_set = Self::new();
-        memory_set.map_trampoline();
+        let mut kernel_space = Self::new();
+        kernel_space.map_trampoline();
 
-        memory_set.insert_identical_area(
+        kernel_space.insert_identical_area(
             VirtAddr::from(stext as usize),
             VirtAddr::from(etext as usize),
             MapPermission::R | MapPermission::X,
         );
-        memory_set.insert_identical_area(
+        kernel_space.insert_identical_area(
             VirtAddr::from(srodata as usize),
             VirtAddr::from(erodata as usize),
             MapPermission::R,
         );
-        memory_set.insert_identical_area(
+        kernel_space.insert_identical_area(
             VirtAddr::from(sdata as usize),
             VirtAddr::from(edata as usize),
             MapPermission::R | MapPermission::W,
         );
-        memory_set.insert_identical_area(
+        kernel_space.insert_identical_area(
             VirtAddr::from(sbss_with_stack as usize),
             VirtAddr::from(ebss as usize),
             MapPermission::R | MapPermission::W,
         );
-        memory_set.insert_identical_area(
+        kernel_space.insert_identical_area(
             VirtAddr::from(MEMORY_START!()),
             VirtAddr::from(MEMORY_END),
             MapPermission::R | MapPermission::W,
@@ -257,7 +296,7 @@ impl MemorySet {
         //         None,
         //     );
         // }
-        memory_set
+        kernel_space
     }
 
     /**
@@ -265,6 +304,10 @@ impl MemorySet {
      * It does be framed mapping but it stores text
      * instead of data. The space has been alloced
      * at `.text` section during compiling.
+     *
+     * In another word, trampoline is data framed
+     * but we need its paddr to locate at a specified
+     * area, it's not consistent with how MapArea works.
      */
     fn map_trampoline(&mut self) {
         self.page_table.map(
@@ -276,6 +319,18 @@ impl MemorySet {
 
     pub fn token(&self) -> usize {
         self.page_table.token()
+    }
+
+    pub fn remove_area_with_start_vpn(&mut self, start_vpn: vpn_t) {
+        if let Some((idx, area)) = self
+            .areas
+            .iter_mut()
+            .enumerate()
+            .find(|(_, area)| area.vpn_range.get_start() == start_vpn)
+        {
+            area.unmap(&mut self.page_table);
+            self.areas.remove(idx);
+        }
     }
 }
 
@@ -293,11 +348,6 @@ bitflags! {
         const X = 1 << 3;
         const U = 1 << 4;
     }
-}
-
-lazy_static! {
-    pub static ref KERNEL_SPACE: Arc<UPSafeRefCell<MemorySet>> =
-        Arc::new(UPSafeRefCell::new(MemorySet::new_kernel()));
 }
 
 pub fn remap_test() {
