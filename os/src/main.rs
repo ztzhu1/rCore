@@ -38,13 +38,11 @@ fn os_main() {
     print_addr_info();
 
     trap::init();
-    // Sv39 paging
-    mm::init();
+    mm::init(); // Sv39 paging
 
-    // trap::enable_timer_interrupt();
-    // timer::set_next_trigger();
+    trap::enable_timer_interrupt();
+    timer::set_next_trigger();
     process::processor::run_procs();
-    // remap_test();
     sbi::exit_success();
 }
 
@@ -66,6 +64,8 @@ fn print_addr_info() {
         boot_stack_upper_bound as usize
     );
     kernel!(".bss    [{:#x}, {:#x})", sbss as usize, ebss as usize);
+
+    assert!(MEMORY_START!() < MEMORY_END, "overflow!");
     kernel!(
         "memory  [{:#x}, {:#x}) ({} KiB)",
         MEMORY_START!() as usize,

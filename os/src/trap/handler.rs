@@ -55,7 +55,7 @@ pub fn trap_handler() -> ! {
             exit_curr_and_run_next(-3);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            info!("timer interrupt: yield.");
+            // info!("timer interrupt: yield.");
             set_next_trigger();
             suspend_curr_and_run_next();
         }

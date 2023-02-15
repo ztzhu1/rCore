@@ -63,7 +63,8 @@ pub fn run_procs() {
             // the control flow will return here.
             // By doing so, the schedule info will
             // be stored on boot stack.
-            info!("scheduled");
+
+            // info!("scheduled");
         }
     }
 }

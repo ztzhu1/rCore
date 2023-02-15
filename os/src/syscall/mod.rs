@@ -17,6 +17,7 @@ const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
 const SYS_GET_TIME: usize = 169;
+const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
 const SYS_EXEC: usize = 221;
 const SYS_WAITPID: usize = 260;
@@ -38,6 +39,9 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
         }
         SYS_GET_TIME => {
             ret = sys_get_time();
+        }
+        SYS_GETPID => {
+            ret = sys_get_pid();
         }
         SYS_FORK => {
             ret = sys_fork() as usize;
@@ -117,6 +121,11 @@ fn sys_exit(exit_code: i32) -> ! {
 fn sys_get_time() -> usize {
     get_time_ms()
 }
+
+fn sys_get_pid() -> usize {
+    get_curr_proc().unwrap().pid.0
+}
+
 #[repr(C)]
 pub struct TimeVal {
     pub sec: usize,
