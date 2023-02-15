@@ -1,7 +1,10 @@
 use crate::config::TRAMPOLINE;
 use core::arch::global_asm;
 use riscv::register::mtvec::TrapMode;
-use riscv::register::{sie, stvec};
+use riscv::register::{
+    scause::{self, Exception, Interrupt, Trap},
+    sie, stval, stvec,
+};
 
 global_asm!(include_str!("trap.S"));
 
@@ -30,6 +33,27 @@ pub fn enable_timer_interrupt() {
 
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
+    let scause = riscv::register::scause::read();
+    let stval = riscv::register::stval::read();
+    let sepc = riscv::register::sepc::read();
+    match scause.cause() {
+        Trap::Exception(Exception::StoreFault)
+        | Trap::Exception(Exception::StorePageFault)
+        | Trap::Exception(Exception::InstructionFault)
+        | Trap::Exception(Exception::InstructionPageFault)
+        | Trap::Exception(Exception::LoadFault)
+        | Trap::Exception(Exception::LoadPageFault) => {
+            error!(
+                "[kernel] {:?} in kernel, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                scause.cause(),
+                stval,
+                sepc
+            );
+        }
+        _ => {
+            error!("[kernel] unhandled kernel trap: {:?}", scause.cause());
+        }
+    }
     panic!("a trap from kernel!");
 }
 

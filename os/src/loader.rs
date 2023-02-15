@@ -13,7 +13,6 @@ pub fn examine_app_id_valid(app_id: usize) {
     }
 }
 
-
 pub fn app_num() -> usize {
     unsafe { (_num_app as *const usize).read_volatile() }
 }

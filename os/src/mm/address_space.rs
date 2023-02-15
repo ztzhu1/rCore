@@ -151,7 +151,7 @@ impl AddressSpace {
     }
 
     pub fn from_user_space(user_space: &Self) -> Self {
-        let mut new_user_space = Self::empty();
+        let mut new_user_space = Self::new();
         // map trampoline
         new_user_space.map_trampoline();
         // copy data sections/trap_context/user_stack
@@ -234,7 +234,7 @@ impl AddressSpace {
         // guard page
         user_stack_bottom += PAGE_SIZE;
         // user stack
-        user_stack_bottom  = VirtAddr::from_vpn(VirtAddr::from(user_stack_bottom).ceil()).0; // align
+        user_stack_bottom = VirtAddr::from_vpn(VirtAddr::from(user_stack_bottom).ceil()).0; // align
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
         user_space.insert_framed_area(
             user_stack_bottom.into(),

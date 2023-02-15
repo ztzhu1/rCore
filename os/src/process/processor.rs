@@ -1,6 +1,8 @@
-use super::manager::fetch_proc;
-use super::pcb::{ProcessContext, ProcessControlBlock, ProcessStatus};
+use super::add_initproc;
+use super::manager::{add_proc, fetch_proc};
+use super::pcb::{self, ProcessContext, ProcessControlBlock, ProcessStatus};
 use super::switch::__switch;
+use crate::loader::app_data_by_name;
 use crate::mm::address::{PhysAddr, VirtAddr};
 use crate::safe_refcell::UPSafeRefCell;
 use crate::trap::TrapContext;
@@ -37,9 +39,11 @@ impl Processor {
 }
 
 pub fn run_procs() {
+    add_initproc();
+    info!("processes running");
+
     loop {
         let mut processor = PROCESSOR.borrow_mut();
-        println!("looping");
         if let Some(proc) = fetch_proc() {
             let idle_proc_cx_ptr = processor.get_idle_proc_cx_ptr();
             // access coming proc TCB exclusively
@@ -59,6 +63,7 @@ pub fn run_procs() {
             // the control flow will return here.
             // By doing so, the schedule info will
             // be stored on boot stack.
+            info!("scheduled");
         }
     }
 }

@@ -23,9 +23,9 @@ extern crate bitflags;
 extern crate alloc;
 
 use alloc::vec;
-use mm::address_space::remap_test;
 use core::arch::{asm, global_asm};
 use ext::*;
+use mm::address_space::remap_test;
 
 use crate::config::MEMORY_END;
 
@@ -43,7 +43,6 @@ fn os_main() {
 
     // trap::enable_timer_interrupt();
     // timer::set_next_trigger();
-    process::add_initproc();
     process::processor::run_procs();
     // remap_test();
     sbi::exit_success();

@@ -1,5 +1,6 @@
 use super::kernel_stack::KernelStack;
 use super::pid::{pid_alloc, PidHandle};
+use super::suspend_curr_and_run_next;
 use crate::config::TRAP_CONTEXT;
 use crate::mm::address::{ppn_t, PhysAddr, VirtAddr};
 use crate::mm::address_space::AddressSpace;

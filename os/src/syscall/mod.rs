@@ -12,6 +12,7 @@ use crate::timer::get_time_ms;
 
 const FD_STDIN: usize = 0;
 
+const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
@@ -23,8 +24,11 @@ const SYS_WAITPID: usize = 260;
 pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret = 0;
     match id {
+        SYS_READ => {
+            ret = sys_read(arg0, arg1 as *mut u8, arg2) as usize;
+        }
         SYS_WRITE => {
-            ret = sys_write(arg0, arg1, arg2);
+            ret = sys_write(arg0, arg1, arg2) as usize;
         }
         SYS_EXIT => {
             sys_exit(arg0 as i32);
@@ -54,7 +58,34 @@ fn vbuf_to_pbuf(buf: usize) -> usize {
     vaddr_to_paddr(vaddr).0
 }
 
-fn sys_write(fd: usize, buf: usize, len: usize) -> usize {
+fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+    match fd {
+        FD_STDIN => {
+            assert_eq!(len, 1, "Only support len = 1 in sys_read!");
+            let mut c: usize;
+            loop {
+                c = console_getchar();
+                if c == 0 {
+                    suspend_curr_and_run_next();
+                    continue;
+                } else {
+                    break;
+                }
+            }
+            let ch = c as u8;
+            let mut buffers = translated_byte_buffer(curr_user_token(), buf, len);
+            unsafe {
+                buffers[0].as_mut_ptr().write_volatile(ch);
+            }
+            1
+        }
+        _ => {
+            panic!("Unsupported fd in sys_read!");
+        }
+    }
+}
+
+fn sys_write(fd: usize, buf: usize, len: usize) -> isize {
     let mut count = 0_usize;
     let buf = vbuf_to_pbuf(buf);
     let begin = buf as *const u8;
@@ -71,7 +102,7 @@ fn sys_write(fd: usize, buf: usize, len: usize) -> usize {
             }
         }
     }
-    count
+    count as isize
 }
 
 fn sys_yield() -> usize {
@@ -99,10 +130,10 @@ fn sys_fork() -> isize {
     let new_proc = curr_proc.fork();
     let new_pid = new_proc.pid.0;
     // modify trap context of new_proc, because it returns immediately after switching
-    let trap_cx = new_proc.inner_borrow_mut().get_trap_cx();
+    let new_trap_cx = new_proc.inner_borrow_mut().get_trap_cx();
     // we do not have to move to next instruction since we have done it before
     // for child process, fork returns 0
-    trap_cx.gp[10] = 0; //gp[10] is a0 reg
+    new_trap_cx.gp[10] = 0; //gp[10] is a0 reg
     add_proc(new_proc); // add new process to scheduler
 
     new_pid as isize
@@ -118,33 +149,6 @@ pub fn sys_exec(path: *const u8) -> isize {
         0
     } else {
         -1
-    }
-}
-
-pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
-    match fd {
-        FD_STDIN => {
-            assert_eq!(len, 1, "Only support len = 1 in sys_read!");
-            let mut c: usize;
-            loop {
-                c = console_getchar();
-                if c == 0 {
-                    suspend_curr_and_run_next();
-                    continue;
-                } else {
-                    break;
-                }
-            }
-            let ch = c as u8;
-            let mut buffers = translated_byte_buffer(curr_user_token(), buf, len);
-            unsafe {
-                buffers[0].as_mut_ptr().write_volatile(ch);
-            }
-            1
-        }
-        _ => {
-            panic!("Unsupported fd in sys_read!");
-        }
     }
 }
 
