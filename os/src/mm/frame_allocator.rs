@@ -72,6 +72,10 @@ impl FrameTracker {
 impl Drop for FrameTracker {
     fn drop(&mut self) {
         frame_dealloc(self.ppn);
+        let frame_paddr = PhysAddr::from_ppn(self.ppn).0;
+        unsafe {
+            core::slice::from_raw_parts_mut(frame_paddr as *mut u8, PAGE_SIZE).fill(0);
+        }
     }
 }
 

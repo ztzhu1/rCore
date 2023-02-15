@@ -84,9 +84,6 @@ pub fn trap_return() -> ! {
     }
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
 
-    // let tc = translated_refmut(user_satp, TRAP_CONTEXT as *mut TrapContext);
-    // println!("{:#x}", tc.sepc);
-
     unsafe {
         asm!(
             "fence.i",

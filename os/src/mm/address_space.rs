@@ -350,6 +350,14 @@ bitflags! {
     }
 }
 
+impl Drop for AddressSpace {
+    fn drop(&mut self) {
+        // self.areas.iter_mut().for_each(|area| {
+        //     area.unmap(&mut self.page_table);
+        // });
+    }
+}
+
 pub fn remap_test() {
     let mut kernel_space = KERNEL_SPACE.borrow_mut();
     let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();

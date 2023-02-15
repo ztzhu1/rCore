@@ -51,7 +51,6 @@ pub fn exit_curr_and_run_next(exit_code: i32) {
     inner.status = ProcessStatus::ZOMBIE;
     // Record exit code
     inner.exit_code = exit_code;
-    println!("{}", proc.pid.0);
     // do not move to its parent but under initproc
 
     // ++++++ access initproc TCB exclusively
