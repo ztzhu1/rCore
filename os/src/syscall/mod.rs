@@ -58,7 +58,7 @@ fn vbuf_to_pbuf(buf: usize) -> usize {
     vaddr_to_paddr(vaddr).0
 }
 
-fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
     match fd {
         FD_STDIN => {
             assert_eq!(len, 1, "Only support len = 1 in sys_read!");
@@ -73,10 +73,8 @@ fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
                 }
             }
             let ch = c as u8;
-            let mut buffers = translated_byte_buffer(curr_user_token(), buf, len);
-            unsafe {
-                buffers[0].as_mut_ptr().write_volatile(ch);
-            }
+            let mut phys_buf = translated_refmut(curr_user_token(), buf);
+            *phys_buf = ch;
             1
         }
         _ => {
