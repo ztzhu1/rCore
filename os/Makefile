@@ -26,6 +26,10 @@ gdb:
     -ex 'set arch riscv:rv64' \
     -ex 'target remote localhost:1234'
 
+app:
+	@cd ../user && make build
+	@rm -rf target/riscv64gc-unknown-none-elf
+
 APP_PATH := ../user/src/bin
 APPS := $(wildcard $(APP_PATH)/*.rs)
 
@@ -33,4 +37,4 @@ link_app:
 	@rustc build.rs && ./build
 	@rm ./build
 
-.PHONY: build run debug gdb link_app
+.PHONY: build run debug gdb link_app app
