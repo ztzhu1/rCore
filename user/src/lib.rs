@@ -86,3 +86,19 @@ pub fn fork() -> isize {
 pub fn exec(path: &str) -> isize {
     sys_exec(path)
 }
+
+/// ms
+pub fn get_time() -> usize {
+    sys_get_time()
+}
+
+pub fn getpid() -> usize {
+    sys_get_pid()
+}
+
+pub fn sleep(period_ms: usize) {
+    let start = sys_get_time();
+    while sys_get_time() < start + period_ms {
+        sys_yield();
+    }
+}

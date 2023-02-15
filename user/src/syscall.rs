@@ -5,6 +5,7 @@ const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
 const SYS_GET_TIME: usize = 169;
+const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
 const SYS_EXEC: usize = 221;
 const SYS_WAITPID: usize = 260;
@@ -40,9 +41,12 @@ pub fn sys_yield() {
     syscall(SYS_YIELD, 0, 0, 0);
 }
 
-#[allow(unused)]
-pub fn sys_get_time() {
-    syscall(SYS_GET_TIME, 0, 0, 0);
+pub fn sys_get_time() -> usize {
+    syscall(SYS_GET_TIME, 0, 0, 0) as usize
+}
+
+pub fn sys_get_pid() -> usize {
+    syscall(SYS_GETPID, 0, 0, 0) as usize
 }
 
 pub fn sys_fork() -> isize {
