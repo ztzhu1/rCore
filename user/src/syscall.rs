@@ -27,8 +27,8 @@ pub fn sys_read(fd: usize, buf: &mut [u8]) -> isize {
     syscall(SYS_READ, fd, buf.as_mut_ptr() as usize, buf.len()) as isize
 }
 
-pub fn sys_write(fd: usize, buf: &[u8]) -> usize {
-    syscall(SYS_WRITE, fd, buf.as_ptr() as usize, buf.len()) as usize
+pub fn sys_write(fd: usize, buf: &[u8]) -> isize {
+    syscall(SYS_WRITE, fd, buf.as_ptr() as usize, buf.len())
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
