@@ -15,6 +15,7 @@ pub fn init() {
 
 fn set_kernel_trap_entry() {
     unsafe {
+        println!("{:#x}", trap_from_kernel as usize);
         stvec::write(trap_from_kernel as usize, TrapMode::Direct);
     }
 }

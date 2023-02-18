@@ -12,7 +12,6 @@ use self::manager::add_proc;
 use self::pcb::{ProcessContext, ProcessControlBlock, ProcessStatus};
 use self::processor::{schedule, take_curr_proc};
 use crate::fs::inode::{open_file, OpenFlags};
-use crate::loader::app_data_by_name;
 
 lazy_static! {
     pub static ref INITPROC: Arc<ProcessControlBlock> = Arc::new({

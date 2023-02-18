@@ -14,7 +14,6 @@ mod drivers;
 mod ext;
 mod fs;
 mod lang_items;
-mod loader;
 mod mm;
 mod process;
 mod safe_refcell;
@@ -41,9 +40,8 @@ fn os_main() {
     clear_bss();
     print_addr_info();
 
-    trap::init();
     mm::init(); // Sv39 paging
-
+    trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     fs::inode::list_apps();

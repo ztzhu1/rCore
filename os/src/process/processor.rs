@@ -2,7 +2,6 @@ use super::add_initproc;
 use super::manager::{add_proc, fetch_proc};
 use super::pcb::{self, ProcessContext, ProcessControlBlock, ProcessStatus};
 use super::switch::__switch;
-use crate::loader::app_data_by_name;
 use crate::mm::address::{PhysAddr, VirtAddr};
 use crate::safe_refcell::UPSafeRefCell;
 use crate::trap::TrapContext;

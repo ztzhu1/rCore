@@ -1,7 +1,6 @@
 use alloc::sync::Arc;
 
 use crate::fs::inode::{open_file, OpenFlags};
-use crate::loader::app_data_by_name;
 use crate::mm::address::VirtAddr;
 use crate::mm::page_table::{
     translated_byte_buffer, translated_refmut, translated_str, PageTable, UserBuffer,
