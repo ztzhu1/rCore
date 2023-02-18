@@ -106,7 +106,7 @@ pub fn frame_alloc() -> Option<FrameTracker> {
     ))
 }
 
-fn frame_dealloc(ppn: ppn_t) {
+pub fn frame_dealloc(ppn: ppn_t) {
     STACK_FRAME_ALLOCATOR.borrow_mut().dealloc(ppn);
 }
 

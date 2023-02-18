@@ -10,7 +10,7 @@ mod block_cache;
 mod block_dev;
 mod efs;
 mod layout;
-mod vfs;
+pub mod vfs;
 
 extern crate alloc;
 

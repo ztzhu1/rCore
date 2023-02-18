@@ -4,11 +4,15 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
+#[path = "boards/qemu.rs"]
+mod board;
 #[macro_use]
 mod console;
 #[macro_use]
 mod config;
+mod drivers;
 mod ext;
+mod fs;
 mod lang_items;
 mod loader;
 mod mm;
@@ -30,7 +34,7 @@ use mm::address_space::remap_test;
 use crate::config::MEMORY_END;
 
 global_asm!(include_str!("entry.S"));
-global_asm!(include_str!("link_app.S"));
+// global_asm!(include_str!("link_app.S"));
 
 #[no_mangle]
 fn os_main() {
@@ -42,6 +46,7 @@ fn os_main() {
 
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
+    fs::inode::list_apps();
     process::processor::run_procs();
     sbi::exit_success();
 }

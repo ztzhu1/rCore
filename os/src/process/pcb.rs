@@ -2,12 +2,16 @@ use super::kernel_stack::KernelStack;
 use super::pid::{pid_alloc, PidHandle};
 use super::suspend_curr_and_run_next;
 use crate::config::TRAP_CONTEXT;
+use crate::fs::stdio::{Stdin, Stdout};
+use crate::fs::File;
 use crate::mm::address::{ppn_t, PhysAddr, VirtAddr};
 use crate::mm::address_space::AddressSpace;
 use crate::safe_refcell::UPSafeRefCell;
 use crate::trap::trap_handler;
 use crate::trap::{trap_return, TrapContext};
+
 use alloc::sync::{Arc, Weak};
+use alloc::vec;
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::{Ref, RefMut};
@@ -78,6 +82,14 @@ impl ProcessControlBlock {
                     parent: None,
                     children: Vec::new(),
                     exit_code: 0,
+                    fd_table: vec![
+                        // 0 -> stdin
+                        Some(Arc::new(Stdin)),
+                        // 1 -> stdout
+                        Some(Arc::new(Stdout)),
+                        // 2 -> stderr
+                        Some(Arc::new(Stdout)),
+                    ],
                 })
             },
         };
@@ -99,6 +111,15 @@ impl ProcessControlBlock {
         let pid_handle = pid_alloc();
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
+        // copy fd table
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
         let process_control_block = Arc::new(ProcessControlBlock {
             pid: pid_handle,
             kernel_stack,
@@ -111,6 +132,7 @@ impl ProcessControlBlock {
                     parent: Some(Arc::downgrade(self)),
                     children: Vec::new(),
                     exit_code: 0,
+                    fd_table: new_fd_table,
                 })
             },
         });
@@ -176,6 +198,7 @@ pub struct ProcessControlBlockInner {
     pub parent: Option<Weak<ProcessControlBlock>>,
     pub children: Vec<Arc<ProcessControlBlock>>,
     pub exit_code: i32,
+    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
 }
 
 impl ProcessControlBlockInner {
@@ -197,5 +220,14 @@ impl ProcessControlBlockInner {
 
     pub fn is_zombie(&self) -> bool {
         self.get_status() == ProcessStatus::ZOMBIE
+    }
+
+    pub fn alloc_fd(&mut self) -> usize {
+        if let Some(fd) = (0..self.fd_table.len()).find(|fd| self.fd_table[*fd].is_none()) {
+            fd
+        } else {
+            self.fd_table.push(None);
+            self.fd_table.len() - 1
+        }
     }
 }

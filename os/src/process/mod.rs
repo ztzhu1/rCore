@@ -11,12 +11,15 @@ use lazy_static::lazy_static;
 use self::manager::add_proc;
 use self::pcb::{ProcessContext, ProcessControlBlock, ProcessStatus};
 use self::processor::{schedule, take_curr_proc};
+use crate::fs::inode::{open_file, OpenFlags};
 use crate::loader::app_data_by_name;
 
 lazy_static! {
-    pub static ref INITPROC: Arc<ProcessControlBlock> = Arc::new(pcb::ProcessControlBlock::new(
-        app_data_by_name("initproc").unwrap()
-    ));
+    pub static ref INITPROC: Arc<ProcessControlBlock> = Arc::new({
+        let inode = open_file("initproc", OpenFlags::RDONLY).unwrap();
+        let v = inode.read_all();
+        ProcessControlBlock::new(v.as_slice())
+    });
 }
 
 pub fn add_initproc() {

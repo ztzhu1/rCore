@@ -1,8 +1,11 @@
 use alloc::sync::Arc;
 
+use crate::fs::inode::{open_file, OpenFlags};
 use crate::loader::app_data_by_name;
 use crate::mm::address::VirtAddr;
-use crate::mm::page_table::{translated_byte_buffer, translated_refmut, translated_str, PageTable};
+use crate::mm::page_table::{
+    translated_byte_buffer, translated_refmut, translated_str, PageTable, UserBuffer,
+};
 use crate::process::manager::add_proc;
 use crate::process::processor::{curr_user_token, get_curr_proc, vaddr_to_paddr};
 use crate::process::{exit_curr_and_run_next, suspend_curr_and_run_next};
@@ -26,14 +29,14 @@ const SYS_WAITPID: usize = 260;
 pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret = 0;
     match id {
-        // SYS_OPEN => {
-        //     ret = sys_open(arg0, arg1 as *mut u8, arg2) as usize;
-        // }
+        SYS_OPEN => {
+            ret = sys_open(arg0 as *const u8, arg1 as u32) as usize;
+        }
         SYS_READ => {
             ret = sys_read(arg0, arg1 as *mut u8, arg2) as usize;
         }
         SYS_WRITE => {
-            ret = sys_write(arg0, arg1, arg2) as usize;
+            ret = sys_write(arg0, arg1 as *const u8, arg2) as usize;
         }
         SYS_EXIT => {
             sys_exit(arg0 as i32);
@@ -66,50 +69,71 @@ fn vbuf_to_pbuf(buf: usize) -> usize {
     vaddr_to_paddr(vaddr).0
 }
 
-
-fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
-    match fd {
-        FD_STDIN => {
-            assert_eq!(len, 1, "Only support len = 1 in sys_read!");
-            let mut c: usize;
-            loop {
-                c = console_getchar();
-                if c == 0 {
-                    suspend_curr_and_run_next();
-                    continue;
-                } else {
-                    break;
-                }
-            }
-            let ch = c as u8;
-            let mut phys_buf = translated_refmut(curr_user_token(), buf);
-            *phys_buf = ch;
-            1
-        }
-        _ => {
-            panic!("Unsupported fd in sys_read!");
-        }
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    let proc = get_curr_proc().unwrap();
+    let token = curr_user_token();
+    let path = translated_str(token, path);
+    if let Some(inode) = open_file(path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+        let mut inner = proc.inner_borrow_mut();
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(inode);
+        fd as isize
+    } else {
+        -1
     }
 }
 
-fn sys_write(fd: usize, buf: usize, len: usize) -> isize {
-    let mut count = 0_usize;
-    let buf = vbuf_to_pbuf(buf);
-    let begin = buf as *const u8;
-    unsafe {
-        loop {
-            let ch = begin.add(count).read_volatile();
-            if ch == 0 {
-                break;
-            }
-            console_putchar(ch as usize);
-            count += 1;
-            if count >= len {
-                break;
-            }
-        }
+pub fn sys_close(fd: usize) -> isize {
+    let proc = get_curr_proc().unwrap();
+    let mut inner = proc.inner_borrow_mut();
+    if fd >= inner.fd_table.len() {
+        return -1;
     }
-    count as isize
+    if inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    inner.fd_table[fd].take();
+    0
+}
+
+fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+    let token = curr_user_token();
+    let proc = get_curr_proc().unwrap();
+    let inner = proc.inner_borrow();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        let file = file.clone();
+        if !file.readable() {
+            return -1;
+        }
+        // release current proc TCB manually to avoid multi-borrow
+        drop(inner);
+        file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+    } else {
+        -1
+    }
+}
+
+fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+    let token = curr_user_token();
+    let proc = get_curr_proc().unwrap();
+    let inner = proc.inner_borrow();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        if !file.writable() {
+            return -1;
+        }
+        let file = file.clone();
+        // release current proc TCB manually to avoid multi-borrow
+        drop(inner);
+        file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+    } else {
+        -1
+    }
 }
 
 fn sys_yield() -> usize {
@@ -156,8 +180,10 @@ pub fn sys_exec(path: *const u8) -> isize {
     // Now we are in kernel space, but the path is stored
     // in user space, so we need to translate the address.
     let path = translated_str(token, path);
-    if let Some(data) = app_data_by_name(path.as_str()) {
-        get_curr_proc().unwrap().exec(data);
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+        let proc = get_curr_proc().unwrap();
+        proc.exec(all_data.as_slice());
         0
     } else {
         -1

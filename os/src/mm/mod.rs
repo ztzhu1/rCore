@@ -15,6 +15,10 @@ pub fn init() {
     KERNEL_SPACE.borrow().activate();
 }
 
+pub fn kernel_token() -> usize {
+    KERNEL_SPACE.borrow().token()
+}
+
 lazy_static! {
     pub static ref KERNEL_SPACE: Arc<UPSafeRefCell<AddressSpace>> =
         Arc::new(UPSafeRefCell::new(AddressSpace::new_kernel()));

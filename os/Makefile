@@ -1,5 +1,6 @@
 ELF_FILE := target/riscv64gc-unknown-none-elf/debug/os
 BIN_FILE := $(ELF_FILE).bin
+FS_IMG := ../user/target/riscv64gc-unknown-none-elf/debug/fs.img
 
 build:
 	@cargo build
@@ -10,7 +11,9 @@ run: build
     -machine virt \
     -nographic \
     -bios ../bootloader/rustsbi-qemu.bin \
-    -device loader,file=$(BIN_FILE),addr=0x80200000
+    -device loader,file=$(BIN_FILE),addr=0x80200000 \
+    -drive file=$(FS_IMG),if=none,format=raw,id=x0 \
+    -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
 debug: build
 	@qemu-system-riscv64 \

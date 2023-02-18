@@ -285,17 +285,17 @@ impl AddressSpace {
             VirtAddr::from(MEMORY_END),
             MapPermission::R | MapPermission::W,
         );
-        // for pair in MMIO {
-        //     memory_set.push(
-        //         MapArea::new(
-        //             (*pair).0.into(),
-        //             ((*pair).0 + (*pair).1).into(),
-        //             MapType::Identical,
-        //             MapPermission::R | MapPermission::W,
-        //         ),
-        //         None,
-        //     );
-        // }
+        for pair in MMIO {
+            kernel_space.push(
+                MapArea::new(
+                    (*pair).0.into(),
+                    ((*pair).0 + (*pair).1).into(),
+                    MapType::IDENTICAL,
+                    MapPermission::R | MapPermission::W,
+                ),
+                None,
+            );
+        }
         kernel_space
     }
 

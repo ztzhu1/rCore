@@ -11,3 +11,9 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 buddy_system_allocator = "0.6"
 bitflags = "1.2.1"
 xmas-elf = "0.9.0"
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
+easy-fs = { path = "../easy-fs" }
+
+[features]
+default = ["board_qemu"]
+board_qemu = []
