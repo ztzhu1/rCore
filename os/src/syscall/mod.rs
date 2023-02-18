@@ -12,6 +12,7 @@ use crate::timer::get_time_ms;
 
 const FD_STDIN: usize = 0;
 
+const SYS_OPEN: usize = 56;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
@@ -25,6 +26,9 @@ const SYS_WAITPID: usize = 260;
 pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret = 0;
     match id {
+        // SYS_OPEN => {
+        //     ret = sys_open(arg0, arg1 as *mut u8, arg2) as usize;
+        // }
         SYS_READ => {
             ret = sys_read(arg0, arg1 as *mut u8, arg2) as usize;
         }
@@ -61,6 +65,7 @@ fn vbuf_to_pbuf(buf: usize) -> usize {
     let vaddr = VirtAddr::from(buf);
     vaddr_to_paddr(vaddr).0
 }
+
 
 fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
     match fd {

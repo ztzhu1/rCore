@@ -18,10 +18,10 @@ mod sbi;
 mod syscall;
 mod timer;
 mod trap;
+
 #[macro_use]
 extern crate bitflags;
 extern crate alloc;
-
 use alloc::vec;
 use core::arch::{asm, global_asm};
 use ext::*;
