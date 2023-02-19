@@ -2,6 +2,7 @@ use core::arch::asm;
 
 const SYS_OPEN: usize = 56;
 const SYS_CLOSE: usize = 57;
+const SYS_PIPE: usize = 59;
 const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
@@ -24,6 +25,15 @@ fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
         );
     }
     ret as isize
+}
+
+/// `pipe`: &[usize; 2][0]
+/// 
+/// return value:
+/// - success: 0
+/// - error: -1 (may because of illegal address)
+pub fn sys_pipe(pipe: &mut [usize]) -> isize {
+    syscall(SYS_PIPE, pipe.as_mut_ptr() as usize, 0, 0) as isize
 }
 
 pub fn sys_open(path: &str, flags: u32) -> isize {
@@ -63,8 +73,8 @@ pub fn sys_fork() -> isize {
     syscall(SYS_FORK, 0, 0, 0)
 }
 
-pub fn sys_exec(path: &str) -> isize {
-    syscall(SYS_EXEC, path.as_ptr() as usize, 0, 0)
+pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
+    syscall(SYS_EXEC, path.as_ptr() as usize, args.as_ptr() as usize, 0)
 }
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {

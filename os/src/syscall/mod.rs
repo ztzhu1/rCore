@@ -1,9 +1,12 @@
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use crate::fs::inode::{open_file, OpenFlags};
+use crate::fs::pipe::make_pipe;
 use crate::mm::address::VirtAddr;
 use crate::mm::page_table::{
-    translated_byte_buffer, translated_refmut, translated_str, PageTable, UserBuffer,
+    translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable, UserBuffer,
 };
 use crate::process::manager::add_proc;
 use crate::process::processor::{curr_user_token, get_curr_proc, vaddr_to_paddr};
@@ -53,7 +56,7 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
             ret = sys_fork() as usize;
         }
         SYS_EXEC => {
-            ret = sys_exec(arg0 as *const u8) as usize;
+            ret = sys_exec(arg0 as *const u8, arg1 as *const usize) as usize;
         }
         SYS_WAITPID => {
             ret = sys_waitpid(arg0 as isize, arg1 as *mut i32) as usize;
@@ -135,6 +138,20 @@ fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 
+pub fn sys_pipe(pipe: *mut usize) -> isize {
+    let proc = get_curr_proc().unwrap();
+    let token = curr_user_token();
+    let mut inner = proc.inner_borrow_mut();
+    let (pipe_read, pipe_write) = make_pipe();
+    let read_fd = inner.alloc_fd();
+    inner.fd_table[read_fd] = Some(pipe_read);
+    let write_fd = inner.alloc_fd();
+    inner.fd_table[write_fd] = Some(pipe_write);
+    *translated_refmut(token, pipe) = read_fd;
+    *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
+    0
+}
+
 fn sys_yield() -> usize {
     suspend_curr_and_run_next();
     0
@@ -174,16 +191,30 @@ fn sys_fork() -> isize {
     new_pid as isize
 }
 
-pub fn sys_exec(path: *const u8) -> isize {
+pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = curr_user_token();
     // Now we are in kernel space, but the path is stored
     // in user space, so we need to translate the address.
     let path = translated_str(token, path);
+
+    let mut args_vec: Vec<String> = Vec::new();
+    loop {
+        let arg_str_ptr = *translated_ref(token, args);
+        if arg_str_ptr == 0 {
+            break;
+        }
+        args_vec.push(translated_str(token, arg_str_ptr as *const u8));
+        unsafe {
+            args = args.add(1);
+        }
+    }
+
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let proc = get_curr_proc().unwrap();
-        proc.exec(all_data.as_slice());
-        0
+        let argc = args_vec.len();
+        proc.exec(all_data.as_slice(), args_vec);
+        argc as isize
     } else {
         -1
     }

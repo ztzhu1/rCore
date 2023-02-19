@@ -2,6 +2,7 @@ use crate::mm::page_table::UserBuffer;
 
 pub mod stdio;
 pub mod inode;
+pub mod pipe;
 
 pub trait File: Send + Sync {
     /// If readable
