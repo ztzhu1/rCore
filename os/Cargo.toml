@@ -17,3 +17,6 @@ easy-fs = { path = "../easy-fs" }
 [features]
 default = ["board_qemu"]
 board_qemu = []
+
+[profile.release]
+debug = true

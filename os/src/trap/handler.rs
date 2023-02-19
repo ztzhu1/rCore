@@ -3,7 +3,7 @@ use super::set_kernel_trap_entry;
 use crate::config::{TRAMPOLINE, TRAP_CONTEXT};
 use crate::mm::address::VirtAddr;
 use crate::mm::page_table::{translated_refmut, PageTable};
-use crate::process::processor::{curr_trap_cx, curr_user_token};
+use crate::process::processor::{curr_trap_cx, curr_user_token, get_curr_proc};
 use crate::process::{exit_curr_and_run_next, suspend_curr_and_run_next, INITPROC};
 use crate::syscall::syscall;
 use crate::timer::set_next_trigger;

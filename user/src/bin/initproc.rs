@@ -10,7 +10,7 @@ use user_lib::{exec, fork, wait, yield_};
 fn main() -> i32 {
     println!("[user][initproc] running");
     if fork() == 0 {
-        println!("[user][user shell] executing user_shell");
+        println!("[user][user_shell] executing user_shell");
         exec("user_shell\0");
     } else {
         println!("[user][initproc] waiting for child process exiting");

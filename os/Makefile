@@ -1,10 +1,13 @@
-ELF_FILE := target/riscv64gc-unknown-none-elf/debug/os
+BUILD_MODE ?= release
+ELF_FILE := target/riscv64gc-unknown-none-elf/$(BUILD_MODE)/os
 BIN_FILE := $(ELF_FILE).bin
-FS_IMG := ../user/target/riscv64gc-unknown-none-elf/debug/fs.img
+FS_IMG_DIR := ../user/target/riscv64gc-unknown-none-elf/$(BUILD_MODE)
+FS_IMG := $(FS_IMG_DIR)/fs.img
 
 build:
-	@cargo build
+	@cargo build --$(BUILD_MODE)
 	@rust-objcopy --strip-all $(ELF_FILE) -O binary $(BIN_FILE)
+	@../easy-fs-fuse/target/$(BUILD_MODE)/easy-fs-fuse -s ../user/src/bin/ -t $(FS_IMG_DIR)/
 
 run: build
 	@qemu-system-riscv64 \
