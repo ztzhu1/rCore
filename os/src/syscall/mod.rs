@@ -17,6 +17,7 @@ use crate::timer::get_time_ms;
 
 const FD_STDIN: usize = 0;
 
+const SYS_DUP: usize = 27;
 const SYS_OPEN: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE: usize = 59;
@@ -33,6 +34,9 @@ const SYS_WAITPID: usize = 260;
 pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret = 0;
     match id {
+        SYS_DUP => {
+            ret = sys_dup(arg0) as usize;
+        }
         SYS_OPEN => {
             ret = sys_open(arg0 as *const u8, arg1 as u32) as usize;
         }
@@ -77,6 +81,20 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
 fn vbuf_to_pbuf(buf: usize) -> usize {
     let vaddr = VirtAddr::from(buf);
     vaddr_to_paddr(vaddr).0
+}
+
+pub fn sys_dup(fd: usize) -> isize {
+    let proc = get_curr_proc().unwrap();
+    let mut inner = proc.inner_borrow_mut();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    let new_fd = inner.alloc_fd();
+    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+    new_fd as isize
 }
 
 pub fn sys_open(path: *const u8, flags: u32) -> isize {

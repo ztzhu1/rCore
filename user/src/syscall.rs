@@ -1,5 +1,6 @@
 use core::arch::asm;
 
+const SYS_DUP: usize = 27;
 const SYS_OPEN: usize = 56;
 const SYS_CLOSE: usize = 57;
 const SYS_PIPE: usize = 59;
@@ -27,8 +28,12 @@ fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
     ret as isize
 }
 
+pub fn sys_dup(fd: usize) -> isize {
+    syscall(SYS_DUP, fd, 0, 0) as isize
+}
+
 /// `pipe`: &[usize; 2][0]
-/// 
+///
 /// return value:
 /// - success: 0
 /// - error: -1 (may because of illegal address)
