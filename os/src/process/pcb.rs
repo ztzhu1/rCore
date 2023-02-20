@@ -1,5 +1,6 @@
 use super::kernel_stack::KernelStack;
 use super::pid::{pid_alloc, PidHandle};
+use super::signal::{SignalActions, SignalFlags};
 use super::suspend_curr_and_run_next;
 use crate::config::TRAP_CONTEXT;
 use crate::fs::stdio::{Stdin, Stdout};
@@ -92,6 +93,13 @@ impl ProcessControlBlock {
                         // 2 -> stderr
                         Some(Arc::new(Stdout)),
                     ],
+                    signal_mask: SignalFlags::empty(),
+                    signals: SignalFlags::empty(),
+                    signal_actions: SignalActions::default(),
+                    handling_sig: -1,
+                    killed: false,
+                    frozen: false,
+                    trap_cx_backup: None,
                 })
             },
         };
@@ -135,6 +143,13 @@ impl ProcessControlBlock {
                     children: Vec::new(),
                     exit_code: 0,
                     fd_table: new_fd_table,
+                    signal_mask: parent_inner.signal_mask,
+                    signals: SignalFlags::empty(),
+                    signal_actions: parent_inner.signal_actions.clone(),
+                    handling_sig: -1,
+                    killed: false,
+                    frozen: false,
+                    trap_cx_backup: None,
                 })
             },
         });
@@ -230,6 +245,13 @@ pub struct ProcessControlBlockInner {
     pub children: Vec<Arc<ProcessControlBlock>>,
     pub exit_code: i32,
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub signal_mask: SignalFlags,
+    pub signals: SignalFlags,
+    pub signal_actions: SignalActions,
+    pub handling_sig: isize,
+    pub killed: bool,
+    pub frozen: bool,
+    pub trap_cx_backup: Option<TrapContext>,
 }
 
 impl ProcessControlBlockInner {

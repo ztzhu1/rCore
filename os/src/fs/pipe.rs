@@ -163,7 +163,7 @@ impl PipeRingBuffer {
         }
     }
 
-pub fn available_write(&self) -> usize {
+    pub fn available_write(&self) -> usize {
         if self.status == RingBufferStatus::FULL {
             0
         } else {

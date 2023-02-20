@@ -61,7 +61,7 @@ impl Hal for VirtioHal {
             assert_eq!(frame.ppn, ppn_base + i);
             QUEUE_FRAMES.borrow_mut().push(frame);
         }
-        let pa  = PhysAddr::from_ppn(ppn_base);
+        let pa = PhysAddr::from_ppn(ppn_base);
         pa.0
     }
 

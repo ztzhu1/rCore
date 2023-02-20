@@ -9,6 +9,8 @@ pub mod console;
 mod heap_allocator;
 mod lang_items;
 mod syscall;
+pub mod signal;
+pub use signal::*;
 
 extern crate alloc;
 
@@ -97,6 +99,30 @@ pub fn exit(exit_code: i32) -> ! {
 
 pub fn yield_() {
     sys_yield();
+}
+
+pub fn kill(pid: usize, signum: i32) -> isize {
+    sys_kill(pid, signum)
+}
+
+pub fn sigaction(
+    signum: i32,
+    action: Option<&SignalAction>,
+    old_action: Option<&mut SignalAction>,
+) -> isize {
+    sys_sigaction(
+        signum,
+        action.map_or(core::ptr::null(), |a| a),
+        old_action.map_or(core::ptr::null_mut(), |a| a)
+    )
+}
+
+pub fn sigprocmask(mask: u32) -> isize {
+    sys_sigprocmask(mask) 
+}
+
+pub fn sigreturn() -> isize {
+    sys_sigreturn()
 }
 
 pub fn wait(exit_code: &mut i32) -> isize {

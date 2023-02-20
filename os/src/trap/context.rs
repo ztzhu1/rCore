@@ -3,6 +3,7 @@ use crate::mm::{address::VirtAddr, KERNEL_SPACE};
 use riscv::register::sstatus::{self, Sstatus, SPP};
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct TrapContext {
     pub gp: [usize; 32], // general purpose regs
     pub sstatus: Sstatus,

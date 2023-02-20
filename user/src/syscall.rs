@@ -1,5 +1,7 @@
 use core::arch::asm;
 
+use crate::signal::SignalAction;
+
 const SYS_DUP: usize = 27;
 const SYS_OPEN: usize = 56;
 const SYS_CLOSE: usize = 57;
@@ -8,6 +10,10 @@ const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
+const SYS_KILL: usize = 129;
+const SYS_SIGACTION: usize = 134;
+const SYS_SIGPROCMASK: usize = 135;
+const SYS_SIGRETURN: usize = 139;
 const SYS_GET_TIME: usize = 169;
 const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
@@ -64,6 +70,26 @@ pub fn sys_exit(exit_code: i32) -> ! {
 
 pub fn sys_yield() {
     syscall(SYS_YIELD, 0, 0, 0);
+}
+
+pub fn sys_kill(pid: usize, signum: i32) -> isize {
+    syscall(SYS_KILL, pid, signum as usize, 0)
+}
+
+pub fn sys_sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *mut SignalAction,
+) -> isize {
+    syscall(SYS_SIGACTION, signum as usize, action as usize, old_action as usize)
+}
+
+pub fn sys_sigprocmask(mask: u32) -> isize {
+    syscall(SYS_SIGPROCMASK, mask as usize, 0, 0)
+}
+
+pub fn sys_sigreturn() -> isize {
+    syscall(SYS_SIGRETURN, 0, 0, 0)
 }
 
 pub fn sys_get_time() -> usize {

@@ -3,15 +3,18 @@ pub mod manager;
 pub mod pcb;
 pub mod pid;
 pub mod processor;
+pub mod signal;
 pub mod switch;
 
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
 
-use self::manager::add_proc;
+use self::manager::{add_proc, remove_from_pid2proc};
 use self::pcb::{ProcessContext, ProcessControlBlock, ProcessStatus};
-use self::processor::{schedule, take_curr_proc};
+use self::processor::{get_curr_proc, schedule, take_curr_proc};
+use self::signal::SignalFlags;
 use crate::fs::inode::{open_file, OpenFlags};
+use crate::sbi::{exit_failure, exit_success};
 
 lazy_static! {
     pub static ref INITPROC: Arc<ProcessControlBlock> = Arc::new({
@@ -43,10 +46,28 @@ pub fn suspend_curr_and_run_next() {
     schedule(proc_cx_ptr);
 }
 
+pub const IDLE_PID: usize = 0;
+
 /// Now assuming INITPROC doesn't exit.
 pub fn exit_curr_and_run_next(exit_code: i32) {
     // take from Processor
     let proc = take_curr_proc().unwrap();
+
+    let pid = proc.pid.0;
+    if pid == IDLE_PID {
+        println!(
+            "[kernel] Idle process exit with exit_code {} ...",
+            exit_code
+        );
+        if exit_code != 0 {
+            exit_failure();
+        } else {
+            exit_success();
+        }
+    }
+
+    // remove from pid2task
+    remove_from_pid2proc(pid);
     // **** access current TCB exclusively
     let mut inner = proc.inner_borrow_mut();
     // Change status to Zombie
@@ -74,4 +95,10 @@ pub fn exit_curr_and_run_next(exit_code: i32) {
     // we do not have to save proc context
     let mut _unused = ProcessContext::empty();
     schedule(&mut _unused as *mut _);
+}
+
+pub fn current_add_signal(signal: SignalFlags) {
+    let proc = get_curr_proc().unwrap();
+    let mut task_inner = proc.inner_borrow_mut();
+    task_inner.signals |= signal;
 }

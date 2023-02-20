@@ -6,10 +6,12 @@ use crate::fs::inode::{open_file, OpenFlags};
 use crate::fs::pipe::make_pipe;
 use crate::mm::address::VirtAddr;
 use crate::mm::page_table::{
-    translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable, UserBuffer,
+    translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable,
+    UserBuffer,
 };
-use crate::process::manager::add_proc;
+use crate::process::manager::{add_proc, pid2proc};
 use crate::process::processor::{curr_user_token, get_curr_proc, vaddr_to_paddr};
+use crate::process::signal::{SignalAction, SignalFlags, MAX_SIG};
 use crate::process::{exit_curr_and_run_next, suspend_curr_and_run_next};
 use crate::sbi::console_getchar;
 use crate::sbi::console_putchar;
@@ -25,6 +27,10 @@ const SYS_READ: usize = 63;
 const SYS_WRITE: usize = 64;
 const SYS_EXIT: usize = 93;
 const SYS_YIELD: usize = 124;
+const SYS_KILL: usize = 129;
+const SYS_SIGACTION: usize = 134;
+const SYS_SIGPROCMASK: usize = 135;
+const SYS_SIGRETURN: usize = 139;
 const SYS_GET_TIME: usize = 169;
 const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
@@ -57,6 +63,22 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
         }
         SYS_YIELD => {
             ret = sys_yield();
+        }
+        SYS_KILL => {
+            ret = sys_kill(arg0, arg1 as i32) as usize;
+        }
+        SYS_SIGACTION => {
+            ret = sys_sigaction(
+                arg0 as i32,
+                arg1 as *const SignalAction,
+                arg2 as *mut SignalAction,
+            ) as usize;
+        }
+        SYS_SIGPROCMASK => {
+            ret = sys_sigprocmask(arg0 as u32) as usize;
+        }
+        SYS_SIGRETURN => {
+            ret = sys_sigreturn() as usize;
         }
         SYS_GET_TIME => {
             ret = sys_get_time();
@@ -124,7 +146,7 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 
-fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = curr_user_token();
     let proc = get_curr_proc().unwrap();
     let inner = proc.inner_borrow();
@@ -144,7 +166,7 @@ fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 
-fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = curr_user_token();
     let proc = get_curr_proc().unwrap();
     let inner = proc.inner_borrow();
@@ -178,9 +200,79 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     0
 }
 
-fn sys_yield() -> usize {
+pub fn sys_yield() -> usize {
     suspend_curr_and_run_next();
     0
+}
+
+pub fn sys_kill(pid: usize, signum: i32) -> isize {
+    if let Some(proc) = pid2proc(pid) {
+        if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+            // insert the signal if legal
+            let mut proc = proc.inner_borrow_mut();
+            if proc.signals.contains(flag) {
+                return -1;
+            }
+            proc.signals.insert(flag);
+            0
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *mut SignalAction,
+) -> isize {
+    let token = curr_user_token();
+    let proc = get_curr_proc().unwrap();
+    let mut inner = proc.inner_borrow_mut();
+    if signum as usize > MAX_SIG {
+        return -1;
+    }
+    if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+        if check_sigaction_error(flag, action as usize, old_action as usize) {
+            return -1;
+        }
+        let prev_action = inner.signal_actions.table[signum as usize];
+        *translated_refmut(token, old_action) = prev_action;
+        inner.signal_actions.table[signum as usize] = *translated_ref(token, action);
+        0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigprocmask(mask: u32) -> isize {
+    if let Some(proc) = get_curr_proc() {
+        let mut inner = proc.inner_borrow_mut();
+        let old_mask = inner.signal_mask;
+        if let Some(flag) = SignalFlags::from_bits(mask) {
+            inner.signal_mask = flag;
+            old_mask.bits() as isize
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigreturn() -> isize {
+    if let Some(proc) = get_curr_proc() {
+        let mut inner = proc.inner_borrow_mut();
+        inner.handling_sig = -1;
+        // restore the trap context
+        let trap_cx = inner.get_trap_cx();
+        *trap_cx = inner.trap_cx_backup.unwrap();
+        trap_cx.gp[10] as isize
+    } else {
+        -1
+    }
 }
 
 fn sys_exit(exit_code: i32) -> ! {
@@ -282,4 +374,16 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         -2
     }
     // ---- stop exclusively accessing current PCB automatically
+}
+
+fn check_sigaction_error(signal: SignalFlags, action: usize, old_action: usize) -> bool {
+    if action == 0
+        || old_action == 0
+        || signal == SignalFlags::SIGKILL
+        || signal == SignalFlags::SIGSTOP
+    {
+        true
+    } else {
+        false
+    }
 }
