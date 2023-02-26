@@ -19,6 +19,8 @@ const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
 const SYS_EXEC: usize = 221;
 const SYS_WAITPID: usize = 260;
+const SYS_THREAD_CREATE: usize = 1000;
+const SYS_WAITTID: usize = 1002;
 
 fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
     let mut ret: usize;
@@ -110,4 +112,12 @@ pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(SYS_WAITPID, pid as usize, exit_code as usize, 0)
+}
+
+pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
+    syscall(SYS_THREAD_CREATE, entry, arg, 0)
+}
+
+pub fn sys_waittid(tid: usize) -> isize {
+    syscall(SYS_WAITTID, tid, 0, 0)
 }

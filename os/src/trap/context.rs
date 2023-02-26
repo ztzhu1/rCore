@@ -14,7 +14,7 @@ pub struct TrapContext {
 }
 
 impl TrapContext {
-    pub fn new(sepc: usize, sp: usize, kernel_sp: usize) -> Self {
+    pub fn new(entry: usize, sp: usize, kernel_sp: usize) -> Self {
         let mut sstatus = riscv::register::sstatus::read();
         // previous privilege mode: user
         sstatus.set_spp(SPP::User);
@@ -22,7 +22,7 @@ impl TrapContext {
         let mut context = Self {
             gp: [0; 32],                                // 0-31
             sstatus,                                    // 32
-            sepc,                                       // 33
+            sepc: entry,                                // 33
             kernel_satp: KERNEL_SPACE.borrow().token(), // 34
             kernel_sp,                                  // 35
             trap_handler: trap_handler as usize,        // 36

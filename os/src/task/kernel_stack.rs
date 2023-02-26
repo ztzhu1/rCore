@@ -1,25 +1,40 @@
+use lazy_static::lazy_static;
+
+use super::id::RecycleAllocator;
 use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE};
 use crate::mm::address_space::MapPermission;
 use crate::mm::{address::VirtAddr, KERNEL_SPACE};
+use crate::safe_refcell::UPSafeRefCell;
 
-use super::pid::PidHandle;
+lazy_static! {
+    static ref KSTACK_ALLOCATOR: UPSafeRefCell<RecycleAllocator> =
+        unsafe { UPSafeRefCell::new(RecycleAllocator::new()) };
+}
+
+pub fn kstack_alloc() -> KernelStack {
+    KernelStack::alloc()
+}
 
 pub struct KernelStack {
-    pid: usize,
+    kid: usize,
     bottom: usize,
     top: usize,
 }
 
 impl KernelStack {
-    pub fn new(pid_handle: &PidHandle) -> Self {
-        let pid = pid_handle.0;
-        let (bottom, top) = Self::position(pid);
+    pub fn alloc() -> Self {
+        let kstack_id = KSTACK_ALLOCATOR.borrow_mut().alloc();
+        let (kstack_bottom, kstack_top) = Self::position(kstack_id);
         KERNEL_SPACE.borrow_mut().insert_framed_area(
-            bottom.into(),
-            top.into(),
+            kstack_bottom.into(),
+            kstack_top.into(),
             MapPermission::R | MapPermission::W,
         );
-        Self { pid, bottom, top }
+        Self {
+            kid: kstack_id,
+            bottom: kstack_bottom,
+            top: kstack_top,
+        }
     }
 
     pub fn push_on_top<T>(&self, value: T) -> *mut T
@@ -37,8 +52,8 @@ impl KernelStack {
         self.top
     }
 
-    pub fn position(pid: usize) -> (usize, usize) {
-        let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    pub fn position(kstack_id: usize) -> (usize, usize) {
+        let top = TRAMPOLINE - kstack_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
         let bottom = top - KERNEL_STACK_SIZE;
         (bottom, top)
     }
@@ -50,5 +65,6 @@ impl Drop for KernelStack {
         KERNEL_SPACE
             .borrow_mut()
             .remove_area_with_start_vpn(start_vpn);
+        KSTACK_ALLOCATOR.borrow_mut().dealloc(self.kid);
     }
 }

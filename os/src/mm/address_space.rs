@@ -230,27 +230,13 @@ impl AddressSpace {
         }
         // map user stack with U flags
         let max_end_va = VirtAddr::from_vpn(max_end_vpn);
-        let mut user_stack_bottom: usize = max_end_va.vpn();
+        let mut user_stack_bottom: usize = VirtAddr::from_vpn(max_end_va.ceil()).0;
         // guard page
-        user_stack_bottom += PAGE_SIZE;
-        // user stack
-        user_stack_bottom = VirtAddr::from_vpn(VirtAddr::from(user_stack_bottom).ceil()).0; // align
-        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        user_space.insert_framed_area(
-            user_stack_bottom.into(),
-            user_stack_top.into(),
-            MapPermission::R | MapPermission::W | MapPermission::U,
-        );
-        // map TrapContext
-        user_space.insert_framed_area(
-            TRAP_CONTEXT.into(),
-            TRAMPOLINE.into(),
-            MapPermission::R | MapPermission::W,
-        );
+        let user_stack_base = user_stack_bottom + PAGE_SIZE;
 
         (
             user_space,
-            user_stack_top,
+            user_stack_base,
             elf.header.pt2.entry_point() as usize,
         )
     }

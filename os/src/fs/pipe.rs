@@ -1,7 +1,7 @@
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 
-use crate::{mm::page_table::UserBuffer, process::suspend_curr_and_run_next};
+use crate::{mm::page_table::UserBuffer, task::suspend_curr_and_run_next};
 
 use super::File;
 

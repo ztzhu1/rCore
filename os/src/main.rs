@@ -15,10 +15,10 @@ mod ext;
 mod fs;
 mod lang_items;
 mod mm;
-mod process;
 mod safe_refcell;
 mod sbi;
 mod syscall;
+mod task;
 mod timer;
 mod trap;
 
@@ -45,7 +45,7 @@ fn os_main() {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     fs::inode::list_apps();
-    process::processor::run_procs();
+    task::processor::run_tasks();
     sbi::exit_success();
 }
 

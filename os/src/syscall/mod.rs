@@ -9,13 +9,15 @@ use crate::mm::page_table::{
     translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable,
     UserBuffer,
 };
-use crate::process::manager::{add_proc, pid2proc};
-use crate::process::processor::{curr_user_token, get_curr_proc, vaddr_to_paddr};
-use crate::process::signal::{SignalAction, SignalFlags, MAX_SIG};
-use crate::process::{exit_curr_and_run_next, suspend_curr_and_run_next};
 use crate::sbi::console_getchar;
 use crate::sbi::console_putchar;
+use crate::task::manager::{add_task, pid2proc};
+use crate::task::processor::{curr_user_token, get_curr_proc, get_curr_task, vaddr_to_paddr};
+use crate::task::signal::{SignalAction, SignalFlags, MAX_SIG};
+use crate::task::tcb::TaskControlBlock;
+use crate::task::{exit_curr_and_run_next, suspend_curr_and_run_next};
 use crate::timer::get_time_ms;
+use crate::trap::TrapContext;
 
 const FD_STDIN: usize = 0;
 
@@ -36,6 +38,8 @@ const SYS_GETPID: usize = 172;
 const SYS_FORK: usize = 220;
 const SYS_EXEC: usize = 221;
 const SYS_WAITPID: usize = 260;
+const SYS_THREAD_CREATE: usize = 1000;
+const SYS_WAITTID: usize = 1002;
 
 pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
     let mut ret = 0;
@@ -67,19 +71,6 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
         SYS_KILL => {
             ret = sys_kill(arg0, arg1 as i32) as usize;
         }
-        SYS_SIGACTION => {
-            ret = sys_sigaction(
-                arg0 as i32,
-                arg1 as *const SignalAction,
-                arg2 as *mut SignalAction,
-            ) as usize;
-        }
-        SYS_SIGPROCMASK => {
-            ret = sys_sigprocmask(arg0 as u32) as usize;
-        }
-        SYS_SIGRETURN => {
-            ret = sys_sigreturn() as usize;
-        }
         SYS_GET_TIME => {
             ret = sys_get_time();
         }
@@ -94,6 +85,12 @@ pub fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
         }
         SYS_WAITPID => {
             ret = sys_waitpid(arg0 as isize, arg1 as *mut i32) as usize;
+        }
+        SYS_THREAD_CREATE => {
+            ret = sys_thread_create(arg0, arg1) as usize;
+        }
+        SYS_WAITTID => {
+            ret = sys_waittid(arg0) as usize;
         }
         _ => panic!("unhandled syscall: {}.", id),
     }
@@ -223,58 +220,6 @@ pub fn sys_kill(pid: usize, signum: i32) -> isize {
     }
 }
 
-pub fn sys_sigaction(
-    signum: i32,
-    action: *const SignalAction,
-    old_action: *mut SignalAction,
-) -> isize {
-    let token = curr_user_token();
-    let proc = get_curr_proc().unwrap();
-    let mut inner = proc.inner_borrow_mut();
-    if signum as usize > MAX_SIG {
-        return -1;
-    }
-    if let Some(flag) = SignalFlags::from_bits(1 << signum) {
-        if check_sigaction_error(flag, action as usize, old_action as usize) {
-            return -1;
-        }
-        let prev_action = inner.signal_actions.table[signum as usize];
-        *translated_refmut(token, old_action) = prev_action;
-        inner.signal_actions.table[signum as usize] = *translated_ref(token, action);
-        0
-    } else {
-        -1
-    }
-}
-
-pub fn sys_sigprocmask(mask: u32) -> isize {
-    if let Some(proc) = get_curr_proc() {
-        let mut inner = proc.inner_borrow_mut();
-        let old_mask = inner.signal_mask;
-        if let Some(flag) = SignalFlags::from_bits(mask) {
-            inner.signal_mask = flag;
-            old_mask.bits() as isize
-        } else {
-            -1
-        }
-    } else {
-        -1
-    }
-}
-
-pub fn sys_sigreturn() -> isize {
-    if let Some(proc) = get_curr_proc() {
-        let mut inner = proc.inner_borrow_mut();
-        inner.handling_sig = -1;
-        // restore the trap context
-        let trap_cx = inner.get_trap_cx();
-        *trap_cx = inner.trap_cx_backup.unwrap();
-        trap_cx.gp[10] as isize
-    } else {
-        -1
-    }
-}
-
 fn sys_exit(exit_code: i32) -> ! {
     info!("Application exited with code {}", exit_code);
     exit_curr_and_run_next(exit_code);
@@ -298,14 +243,15 @@ pub struct TimeVal {
 fn sys_fork() -> isize {
     let curr_proc = get_curr_proc().unwrap();
     let new_proc = curr_proc.fork();
+    let new_proc_inner = new_proc.inner_borrow_mut();
     let new_pid = new_proc.pid.0;
     // modify trap context of new_proc, because it returns immediately after switching
-    let new_trap_cx = new_proc.inner_borrow_mut().get_trap_cx();
+
+    let task = new_proc_inner.tasks[0].as_ref().unwrap();
+    let trap_cx = task.inner_borrow_mut().get_trap_cx();
     // we do not have to move to next instruction since we have done it before
     // for child process, fork returns 0
-    new_trap_cx.gp[10] = 0; //gp[10] is a0 reg
-    add_proc(new_proc); // add new process to scheduler
-
+    trap_cx.gp[10] = 0;
     new_pid as isize
 }
 
@@ -357,7 +303,7 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     }
     let pair = inner.children.iter().enumerate().find(|(_, p)| {
         // ++++ temporarily access child PCB exclusively
-        p.inner_borrow_mut().is_zombie() && (pid == -1 || pid as usize == p.get_pid())
+        p.inner_borrow_mut().is_zombie && (pid == -1 || pid as usize == p.get_pid())
         // ++++ stop exclusively accessing child PCB
     });
     if let Some((idx, _)) = pair {
@@ -374,6 +320,63 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
         -2
     }
     // ---- stop exclusively accessing current PCB automatically
+}
+
+pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
+    let task = get_curr_task().unwrap();
+    let process = task.process.upgrade().unwrap();
+    // create a new thread
+    let new_task = Arc::new(TaskControlBlock::new(
+        Arc::clone(&process),
+        task.inner_borrow_mut().res.as_ref().unwrap().ustack_base,
+        true,
+    ));
+    // add new task to scheduler
+    add_task(Arc::clone(&new_task));
+    let new_task_inner = new_task.inner_borrow_mut();
+    let new_task_res = new_task_inner.res.as_ref().unwrap();
+    let new_task_tid = new_task_res.tid;
+    let mut process_inner = process.inner_borrow_mut();
+    // add new thread to current process
+    let tasks = &mut process_inner.tasks;
+    while tasks.len() < new_task_tid + 1 {
+        tasks.push(None);
+    }
+    tasks[new_task_tid] = Some(Arc::clone(&new_task));
+    let new_task_trap_cx = new_task_inner.get_trap_cx();
+    *new_task_trap_cx =
+        TrapContext::app_init_context(entry, new_task_res.ustack_top(), new_task.kstack.get_top());
+    (*new_task_trap_cx).gp[10] = arg;
+    new_task_tid as isize
+}
+
+pub fn sys_waittid(tid: usize) -> i32 {
+    let task = get_curr_task().unwrap();
+    let process = task.process.upgrade().unwrap();
+    let task_inner = task.inner_borrow_mut();
+    let mut process_inner = process.inner_borrow_mut();
+    // a thread cannot wait for itself
+    if task_inner.res.as_ref().unwrap().tid == tid {
+        return -1;
+    }
+    let mut exit_code: Option<i32> = None;
+    let waited_task = process_inner.tasks[tid].as_ref();
+    if let Some(waited_task) = waited_task {
+        if let Some(waited_exit_code) = waited_task.inner_borrow_mut().exit_code {
+            exit_code = Some(waited_exit_code);
+        }
+    } else {
+        // waited thread does not exist
+        return -1;
+    }
+    if let Some(exit_code) = exit_code {
+        // dealloc the exited thread
+        process_inner.tasks[tid] = None;
+        exit_code
+    } else {
+        // waited thread has not exited
+        -2
+    }
 }
 
 fn check_sigaction_error(signal: SignalFlags, action: usize, old_action: usize) -> bool {
