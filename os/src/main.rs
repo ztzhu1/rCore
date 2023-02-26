@@ -42,8 +42,8 @@ fn os_main() {
 
     mm::init(); // Sv39 paging
     trap::init();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
+    // trap::enable_timer_interrupt();
+    // timer::set_next_trigger();
     fs::inode::list_apps();
     task::processor::run_tasks();
     sbi::exit_success();

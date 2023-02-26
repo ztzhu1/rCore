@@ -4,6 +4,7 @@ use super::{address::*, page_table};
 use crate::config::*;
 use crate::ext::*;
 use crate::mm::KERNEL_SPACE;
+use crate::task::processor::get_curr_proc;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;

@@ -8,11 +8,26 @@ pub type offset_t = usize;
 pub type ppn_t = usize;
 pub type vpn_t = usize;
 
+/// For paddr, only 55-0 is valid.
 #[macro_export]
 macro_rules! apply_mask {
     ($v: expr, $width: expr) => {
         $v & ((1usize << $width) - 1)
     };
+}
+
+/// For vaddr, only 38-0 is valid (Sv39), 63-39
+/// should be the same with the 38th bit.
+/// We can't apply mask to vaddr because
+/// it uses both lowest and highest address.
+/// But we can validate if the 63-38 bits are
+/// all 0s or 1s.
+#[macro_export]
+macro_rules! valid {
+    ($v: expr, $width: expr) => {{
+        assert!(($v >> $width == (1usize << (64 - $width)) - 1) || ($v >> $width == 0));
+        $v
+    }};
 }
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -27,7 +42,7 @@ impl From<usize> for PhysAddr {
 impl Debug for PhysAddr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "paddr:{:#x}, ppn:{}, offset:{}",
+            "paddr:{:#x}, ppn:{:#x}, offset:{:#x}",
             self.0,
             self.ppn(),
             self.offset()
@@ -78,14 +93,14 @@ pub struct VirtAddr(pub usize);
 
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(apply_mask!(v, VA_WIDTH_SV39))
+        Self(valid!(v, VA_WIDTH_SV39))
     }
 }
 
 impl Debug for VirtAddr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "vaddr:{:#x}, vpn:{}, offset:{}",
+            "vaddr:{:#x}, vpn:{:#x}, offset:{:#x}",
             self.0,
             self.vpn(),
             self.offset()
@@ -99,7 +114,9 @@ impl VirtAddr {
     }
 
     pub fn vpn(&self) -> vpn_t {
-        apply_mask!(self.0 >> OFFSET_WIDTH, VPN_WIDTH_SV39)
+        // wrong. We are doing logical shift.
+        // valid!(self.0 >> OFFSET_WIDTH, VPN_WIDTH_SV39)
+        self.0 >> OFFSET_WIDTH
     }
 
     pub fn offset(&self) -> offset_t {

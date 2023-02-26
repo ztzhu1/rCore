@@ -136,8 +136,9 @@ pub fn exit_curr_and_run_next(exit_code: i32) {
         process_inner.user_space.recycle_data_frames();
         // drop file descriptors
         process_inner.fd_table.clear();
-        // remove all tasks
-        process_inner.tasks.clear();
+        // remove all tasks except the first (the main) one.
+        // process_inner.tasks.clear();
+        process_inner.tasks.drain(1..);
     }
     drop(process);
     // we do not have to save task context
